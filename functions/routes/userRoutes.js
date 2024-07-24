@@ -1,0 +1,37 @@
+const router = require("express").Router();
+const { authenticateJWT, roleMiddleware } = require("../middleware/auth");
+
+const { individualInvite } = require("../controllers/InviteController");
+
+const {
+  registerUser,
+  loginUser,
+  purchaseRequestFromClient,
+  performFunction,
+  getUser,
+} = require("../controllers/userController");
+
+// User - Information
+router.get("/", authenticateJWT, getUser);
+
+// Register Route for client and customer
+router.post("/register", registerUser);
+
+// Login Route
+router.post("/login", loginUser);
+
+// Customer - purchase Credits from Client
+router.post(
+  "/purchase-request-from-client",
+  authenticateJWT,
+  roleMiddleware(["customer"]),
+  purchaseRequestFromClient
+);
+
+router.post(
+  `/sendIndividualInvite`,
+  authenticateJWT,
+  individualInvite
+);
+
+module.exports = router;
