@@ -131,9 +131,23 @@ const purchaseRequestFromAdmin = async (req, res) => {
   }
 };
 
+const getRequests = async(req,res) =>{
+  const user = req.user._id;
+  const requests = await Request.find({user}).populate('user').select("-password")
+  if(!requests){
+    return res.status(401).json({
+      message:"no requests"
+    })
+  }
+  return res.status(200).json({
+    data:requests,
+    message:"requests fetched successfully"
+  })
+}
 module.exports = {
   getClient,
   createCustomer,
   transferCredit,
   purchaseRequestFromAdmin,
+  getRequests
 };
