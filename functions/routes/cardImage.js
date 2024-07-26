@@ -19,13 +19,9 @@ const archiver = require("archiver");
 
 const router = express.Router();
 
-const UPLOAD_DIR =path.join(__dirname,"../tmp");
+const UPLOAD_DIR = os.tmpdir() || "/tmp";
 const VIDEO_UPLOAD_DIR = path.join(UPLOAD_DIR, "video");
 const CSV_UPLOAD_DIR = path.join(UPLOAD_DIR, "guestNames");
-
-if (!fs.existsSync(UPLOAD_DIR)) {
-  fs.mkdirSync(UPLOAD_DIR);
-}
 
 if (!fs.existsSync(VIDEO_UPLOAD_DIR)) {
   fs.mkdirSync(VIDEO_UPLOAD_DIR);
@@ -126,7 +122,7 @@ const createImagesForGuest = async (
     console.log("Image processing complete.");
 
     return outputBuffer;
-  } catch (error){
+  } catch (error) {
     throw error;
   }
 };
@@ -297,7 +293,7 @@ router.post(
       console.error(error);
       res.status(400).json({ error: "Video processing failed" });
     } finally {
-      // fs.unlinkSync(inputPath);
+      fs.unlinkSync(inputPath);
     }
   }
 );

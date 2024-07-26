@@ -42,4 +42,4 @@ app.listen(8000, () => {
     console.log("listening")
 })
 
-// exports.app = functions.https.onRequest(app);
+exports.app = functions.https.onRequest(app);
