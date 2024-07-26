@@ -181,7 +181,6 @@ const getAllEvents = async (req, res) => {
         },
       },
     ]);
-    console.log(events);
     res.status(200).json({
       success: true,
       message: "All events fetched successfully",

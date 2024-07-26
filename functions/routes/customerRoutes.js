@@ -2,6 +2,7 @@ const router = require("express").Router();
 const {
   getCustomer,
   updateCustomer,
+  searchCustomers, // Import the new function
 } = require("../controllers/customerController");
 const {
   getEvent,
@@ -9,26 +10,32 @@ const {
 } = require("../controllers/eventController");
 const { authenticateJWT, roleMiddleware } = require("../middleware/auth");
 
+// Route to get customer information
 router.get(
   "/customerInfo/:customerId",
   authenticateJWT,
   getCustomer
 );
+
+// Route to update customer information
 router.put(
   "/updateCustomer/:customerId",
   authenticateJWT,
   updateCustomer
 );
+
+// Route to get all events for a customer
 router.get(
   "/customerEvents/:customerId",
   authenticateJWT,
   getAllCustomerEvents
 );
 
-
-
-router.get('/customerInfo/:customerId',authenticateJWT,getCustomer)
-router.put('/updateCustomer/:customerId',authenticateJWT,updateCustomer)
-router.get('/customerEvents/:customerId',authenticateJWT,getAllCustomerEvents)
+// Route to search customers by name
+router.get(
+  "/searchCustomers",
+  authenticateJWT,
+  searchCustomers
+);
 
 module.exports = router;
