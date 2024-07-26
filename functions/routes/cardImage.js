@@ -9,10 +9,12 @@ const sharp = require("sharp");
 const { authenticateJWT } = require("../middleware/auth");
 const createTransaction = require("../utility/creditTransiction");
 const { User } = require("../models/User");
-const { Event } = require("../models/Event");
 const { app, firebaseStorage } = require("../firebaseConfig");
 const { ref, uploadBytes, getDownloadURL } = require("firebase/storage");
-const { downloadGoogleFont } = require("../utility/proccessing");
+const {
+  downloadGoogleFont,
+  addOrUpdateGuests,
+} = require("../utility/proccessing");
 const archiver = require("archiver");
 
 const router = express.Router();
@@ -135,7 +137,10 @@ const uploadFileToFirebase = async (
   try {
     let storageRef;
     if (isSample === "true") {
-      storageRef = ref(firebaseStorage, `sample/sample${i}.png`);
+      storageRef = ref(
+        firebaseStorage,
+        `sample/sample${i}${i === "zip" ? ".zip" : ".png"}`
+      );
     } else {
       storageRef = ref(firebaseStorage, `uploads/${clientId}/${filename}`);
     }
@@ -161,41 +166,6 @@ const processCsvFile = (csvFilePath) => {
       .on("error", reject);
   });
 };
-
-async function addOrUpdateGuests(eventId, guests) {
-  try {
-    const event = await Event.findById(eventId);
-    if (!event) {
-      throw new Error("Event not found");
-    }
-
-    guests.forEach((guest) => {
-      const existingGuestIndex = event.guests.findIndex(
-        (g) => g.mobileNumber === guest.mobileNumber
-      );
-
-      if (existingGuestIndex !== -1) {
-        event.guests[existingGuestIndex].name = guest.name;
-        event.guests[existingGuestIndex].imageUrl =
-          event.guests[existingGuestIndex].imageUrl || guest.link;
-      } else {
-        event.guests.push({
-          name: guest.name,
-          mobileNumber: guest.mobileNumber,
-          // pdfUrl: guest.pdfUrl || undefined,
-          imageUrl: guest.link || undefined,
-          // videoUrl: guest.videoUrl || undefined,
-        });
-      }
-    });
-
-    const updatedEvent = await event.save();
-    return updatedEvent;
-  } catch (error) {
-    console.error("Error in addOrUpdateGuests:", error);
-    throw error;
-  }
-}
 
 router.post(
   "/",
