@@ -1,7 +1,10 @@
 const functions = require("firebase-functions");
 const express = require("express");
-const dotenv = require("dotenv");
 const cors = require("cors");
+const dotenv = require("dotenv");
+dotenv.config();
+
+
 const connectDB = require("./config/db");
 const userRoutes = require("./routes/userRoutes");
 const clientRoutes = require("./routes/clientRoutes");
@@ -9,12 +12,11 @@ const adminRoutes = require("./routes/adminRoutes");
 const customerRoutes = require("./routes/customerRoutes");
 const cardRoutes = require("./routes/cardImage");
 // const videoRoutes = require('./routes/videoRoutes');
-// const PdfRoutes = require('./routes/cardPdf');
+const PdfRoutes = require('./routes/cardPdf');
 const eventRoutes = require("./routes/eventRoutes");
 const transictionRoutes = require("./routes/TransictionRoutes");
 const app = express();
 
-dotenv.config();
 connectDB();
 
 app.use(cors());
@@ -36,10 +38,10 @@ app.use("/api/transictions", transictionRoutes);
 
 // app.use('/api/videoEdit', videoRoutes);
 app.use("/api/imageEdit", cardRoutes);
-// app.use('/api/pdfEdit', PdfRoutes)
+app.use('/api/pdfEdit', PdfRoutes)
 
-app.listen(8000, () => {
-    console.log("listening")
-})
+// app.listen(8000, () => {
+//     console.log("listening")
+// })
 
 exports.app = functions.https.onRequest(app);

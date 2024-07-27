@@ -1,5 +1,5 @@
 const express = require("express");
-const multer = require("multer");
+const { fileParser } = require("express-multipart-file-parser");
 const fs = require("fs");
 const path = require("path");
 const ffmpeg = require("fluent-ffmpeg");
@@ -15,12 +15,13 @@ ffmpeg.setFfmpegPath(ffmpegPath);
 const router = express.Router();
 
 const UPLOAD_DIR = path.join(__dirname, "../tmp");
+// const UPLOAD_DIR = os.tmpdir() || "/tmp";
 const VIDEO_UPLOAD_DIR = path.join(UPLOAD_DIR, "video");
 const CSV_UPLOAD_DIR = path.join(UPLOAD_DIR, "guestNames");
 const TEMP_DIR = path.join(UPLOAD_DIR, "temp");
 
-if (!fs.existsSync(UPLOAD_DIR)) {
-  fs.mkdirSync(UPLOAD_DIR);
+if (!fs.existsSync(TEMP_DIR)) {
+  fs.mkdirSync(TEMP_DIR);
 }
 if (!fs.existsSync(CSV_UPLOAD_DIR)) {
   fs.mkdirSync(CSV_UPLOAD_DIR);
@@ -44,7 +45,7 @@ const convertImageToVideo = (imagePath, videoPath, duration = 2) => {
         "-c:v libx264", // Use the H.264 codec
         "-crf 18", // Set the quality (lower is better)
         "-preset veryfast", // Set the encoding speed/quality trade-off
-        "-movflags +faststart" // Optimize for web playback
+        "-movflags +faststart", // Optimize for web playback
       ])
       .output(videoPath)
       .on("end", () => {
@@ -60,22 +61,6 @@ const convertImageToVideo = (imagePath, videoPath, duration = 2) => {
   });
 };
 
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    if (file.fieldname === "guestNames") {
-      cb(null, CSV_UPLOAD_DIR);
-    } else if (file.fieldname === "video") {
-      cb(null, VIDEO_UPLOAD_DIR);
-    }
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname));
-  },
-});
-
-const upload = multer({ storage });
-
 const createCanvasWithCenteredText = async (
   val,
   property,
@@ -85,7 +70,6 @@ const createCanvasWithCenteredText = async (
 ) => {
   const fontPath = await downloadGoogleFont(property.fontFamily);
   registerFont(fontPath, { family: property.fontFamily });
-
 
   let tempTextName = property.text.replace(
     /{(\w+)}/g,
@@ -111,7 +95,7 @@ const createCanvasWithCenteredText = async (
 
   let fontSize = property.fontSize * scalingFont;
   ctx.font = `${fontSize}px ${property.fontFamily}`;
-  
+
   // Adjust font size to fit text within canvas width
   while (ctx.measureText(tempTextName).width > width && fontSize > 1) {
     fontSize--;
@@ -135,7 +119,11 @@ const createCanvasWithCenteredText = async (
 
   saveDataURLAsImage(dataURL, imageFilePath);
 
-  await convertImageToVideo(imageFilePath, videoFilePath, property.duration - property.startTime);
+  await convertImageToVideo(
+    imageFilePath,
+    videoFilePath,
+    property.duration - property.startTime
+  );
 
   // Clean up the temporary image file
   fs.unlinkSync(imageFilePath);
@@ -154,18 +142,271 @@ const createVideoForGuest = (
 ) => {
   return new Promise(async (resolve, reject) => {
     const streams = await Promise.all(
-      texts.map((text) => createCanvasWithCenteredText(
-        val,
-        text,
-        scalingFont,
-        scalingH,
-        scalingW
-      ))
+      texts.map((text) =>
+        createCanvasWithCenteredText(val, text, scalingFont, scalingH, scalingW)
+      )
     );
 
     // Assign the resolved values to text.stream
     streams.forEach((stream, index) => {
       texts[index].stream = stream;
+      const createVideoForGuest = (
+        inputPath,
+        texts,
+        scalingFont,
+        scalingH,
+        scalingW,
+        val,
+        i
+      ) => {
+        return new Promise(async (resolve, reject) => {
+          const streams = await Promise.all(
+            texts.map((text) =>
+              createCanvasWithCenteredText(
+                val,
+                text,
+                scalingFont,
+                scalingH,
+                scalingW
+              )
+            )
+          );
+
+          // Assign the resolved values to text.stream
+          streams.forEach((stream, index) => {
+            texts[index].stream = stream;
+          });
+
+          const outputFilename = `processed_${i}_${Date.now()}.mp4`;
+          const outputPath = path.join(UPLOAD_DIR, outputFilename);
+
+          const processedVideo = ffmpeg(inputPath);
+
+          texts.forEach(async (text) => {
+            processedVideo.input(await text.stream);
+          });
+
+          const configuration = texts.flatMap((text, idx) => {
+            const xPos = parseInt(text.position.x * scalingW);
+            const yPos = parseInt(text.position.y * scalingH + 5);
+
+            let filterConfig = {
+              filter: "overlay",
+              options: {
+                x: xPos,
+                y: yPos,
+                enable: `between(t,${parseInt(text.startTime)},${parseInt(
+                  text.duration // this is end time
+                )})`,
+              },
+              inputs:
+                idx === 0 ? ["0:v", "1:v"] : [`[tmp${idx}]`, `${idx + 1}:v`],
+              outputs: idx === texts.length - 1 ? "result" : `[tmp${idx + 1}]`,
+            };
+
+            // Add transition filter if specified
+            if (text.transition) {
+              switch (text.transition.type) {
+                case "move_up":
+                  filterConfig = {
+                    filter: "overlay",
+                    options: {
+                      x: xPos,
+                      y: `if(lt(t,${text.startTime}+${
+                        text.transition.options.duration
+                      }), (${yPos + text.transition.options.top} + (t-${
+                        text.startTime
+                      })*(${yPos}-${yPos + text.transition.options.top})/${
+                        text.transition.options.duration
+                      }), ${yPos})`,
+                      enable: `between(t,${text.startTime},${text.duration})`,
+                    },
+                    inputs:
+                      idx === 0
+                        ? ["0:v", "1:v"]
+                        : [`[tmp${idx}]`, `${idx + 1}:v`],
+                    outputs:
+                      idx === texts.length - 1 ? "result" : `[tmp${idx + 1}]`,
+                  };
+                  break;
+                case "move_down":
+                  filterConfig = {
+                    filter: "overlay",
+                    options: {
+                      x: xPos,
+                      y: `if(lt(t,${text.startTime}+${
+                        text.transition.options.duration
+                      }), (${yPos - text.transition.options.bottom} + (t-${
+                        text.startTime
+                      })*(${yPos}-${yPos - text.transition.options.bottom})/${
+                        text.transition.options.duration
+                      }), ${yPos})`,
+                      enable: `between(t,${text.startTime},${text.duration})`,
+                    },
+                    inputs:
+                      idx === 0
+                        ? ["0:v", "1:v"]
+                        : [`[tmp${idx}]`, `${idx + 1}:v`],
+                    outputs:
+                      idx === texts.length - 1 ? "result" : `[tmp${idx + 1}]`,
+                  };
+                  break;
+                case "move_right":
+                  filterConfig = {
+                    filter: "overlay",
+                    options: {
+                      x: `if(lt(t,${text.startTime}+${
+                        text.transition.options.duration
+                      }), (${xPos - text.transition.options.right} + (t-${
+                        text.startTime
+                      })*(${xPos}-${xPos - text.transition.options.right})/${
+                        text.transition.options.duration
+                      }), ${xPos})`,
+                      y: yPos,
+                      enable: `between(t,${text.startTime},${text.duration})`,
+                    },
+                    inputs:
+                      idx === 0
+                        ? ["0:v", "1:v"]
+                        : [`[tmp${idx}]`, `${idx + 1}:v`],
+                    outputs:
+                      idx === texts.length - 1 ? "result" : `[tmp${idx + 1}]`,
+                  };
+                  break;
+                case "move_left":
+                  filterConfig = {
+                    filter: "overlay",
+                    options: {
+                      x: `if(lt(t,${text.startTime}+${
+                        text.transition.options.duration
+                      }), (${xPos + text.transition.options.left} + (t-${
+                        text.startTime
+                      })*(${xPos}-${xPos + text.transition.options.left})/${
+                        text.transition.options.duration
+                      }), ${xPos})`,
+                      y: yPos,
+                      enable: `between(t,${text.startTime},${text.duration})`,
+                    },
+                    inputs:
+                      idx === 0
+                        ? ["0:v", "1:v"]
+                        : [`[tmp${idx}]`, `${idx + 1}:v`],
+                    outputs:
+                      idx === texts.length - 1 ? "result" : `[tmp${idx + 1}]`,
+                  };
+                  break;
+                case "slide":
+                  filterConfig = {
+                    filter: "overlay",
+                    options: {
+                      x: `if(lt(t,${text.startTime}+${
+                        text.transition.options.duration
+                      }), (${xPos - text.transition.options.left} + (t-${
+                        text.startTime
+                      })*(${xPos + text.transition.options.right}-${
+                        xPos - text.transition.options.left
+                      })/${text.transition.options.duration}), ${
+                        xPos + text.transition.options.right
+                      })`,
+                      y: `if(lt(t,${text.startTime}+${
+                        text.transition.options.duration
+                      }), (${yPos - text.transition.options.top} + (t-${
+                        text.startTime
+                      })*(${yPos + text.transition.options.bottom}-${
+                        yPos - text.transition.options.top
+                      })/${text.transition.options.duration}), ${
+                        yPos + text.transition.options.bottom
+                      })`,
+                      enable: `between(t,${text.startTime},${text.duration})`,
+                    },
+                    inputs:
+                      idx === 0
+                        ? ["0:v", "1:v"]
+                        : [`[tmp${idx}]`, `${idx + 1}:v`],
+                    outputs:
+                      idx === texts.length - 1 ? "result" : `[tmp${idx + 1}]`,
+                  };
+                  break;
+                case "path_cover":
+                  const rotationSpeed = text.transition.options.rotationSpeed;
+                  const clockwise = text.transition.options.clockwise !== false; // Default to clockwise if not specified
+
+                  filterConfig = {
+                    filter: "overlay",
+                    options: {
+                      x: `if(lt(t,${text.startTime}),${xPos},if(lt(t,${
+                        text.startTime
+                      } + 1/${rotationSpeed}),${xPos} + (overlay_w/5) * cos(2*PI*${
+                        clockwise ? "" : "-"
+                      }${rotationSpeed}*(t-${text.startTime})),${xPos}))`,
+                      y: `if(lt(t,${text.startTime}),${yPos},if(lt(t,${
+                        text.startTime
+                      } + 1/${rotationSpeed}),${yPos} + (overlay_h/5) * sin(2*PI*${
+                        clockwise ? "" : "-"
+                      }${rotationSpeed}*(t-${text.startTime})),${yPos}))`,
+                      enable: `between(t,${text.startTime},${text.duration})`,
+                      eval: "frame",
+                    },
+                    inputs:
+                      idx === 0
+                        ? ["0:v", "1:v"]
+                        : [`[tmp${idx}]`, `${idx + 1}:v`],
+                    outputs:
+                      idx === texts.length - 1 ? "result" : `[tmp${idx + 1}]`,
+                  };
+                  break;
+                case "fade":
+                  const fadeConfig = [
+                    {
+                      filter: "fade",
+                      options: {
+                        type: "in",
+                        start_time: text.startTime,
+                        duration: text.transition.options.duration, // Fade duration in seconds
+                      },
+                      inputs: `1:v`, // Each input stream (starting from 1)
+                      outputs: `fade${idx + 1}`,
+                    },
+                    {
+                      filter: "overlay",
+                      options: {
+                        x: xPos,
+                        y: yPos,
+                        enable: `between(t,${parseInt(
+                          text.startTime
+                        )},${parseInt(text.duration)})`,
+                      },
+                      inputs:
+                        idx === 0
+                          ? ["0:v", `fade${idx + 1}`]
+                          : [`[tmp${idx}]`, `fade${idx + 1}`],
+                      outputs:
+                        idx === texts.length - 1 ? "result" : `[tmp${idx + 1}]`,
+                    },
+                  ];
+                  return fadeConfig;
+                default:
+                  break;
+              }
+            }
+
+            return filterConfig;
+          });
+
+          processedVideo
+            .complexFilter(configuration, "result")
+            .outputOptions(["-c:v libx264", "-c:a aac", "-map 0:a:0"])
+            .output(outputPath)
+            .on("end", () => {
+              resolve(outputFilename);
+            })
+            .on("error", (err) => {
+              console.log(err);
+              reject(err);
+            })
+            .run();
+        });
+      };
     });
 
     const outputFilename = `processed_${i}_${Date.now()}.mp4`;
@@ -364,21 +605,15 @@ const createVideoForGuest = (
 
       return filterConfig;
     });
-    
+
     processedVideo
       .complexFilter(configuration, "result")
       .outputOptions(["-c:v libx264", "-c:a aac", "-map 0:a:0"])
       .output(outputPath)
       .on("end", () => {
-        // texts.forEach((text) => {
-        //   fs.unlinkSync(text.stream);
-        // });
         resolve(outputFilename);
       })
       .on("error", (err) => {
-        // texts.forEach((text) => {
-        //   fs.unlinkSync(text.stream);
-        // });
         console.log(err);
         reject(err);
       })
@@ -401,17 +636,38 @@ const processCsvFile = (csvFilePath) => {
 };
 
 router.post(
-  "/",authenticateJWT,
-  upload.fields([
-    { name: "video", maxCount: 1 },
-    { name: "guestNames", maxCount: 1 },
-  ]),
+  "/",
+  authenticateJWT,
+  fileParser({ rawBodyOptions: { limit: "200mb" } }),
   async (req, res) => {
+    let inputPath;
     try {
-      const { textProperty, scalingFont, scalingW, scalingH, isSample } = req.body;
+      const { textProperty, scalingFont, scalingW, scalingH, isSample } =
+        req.body;
 
-      const csvFilePath = isSample === "true" ? "" : req.files.guestNames[0].path;
-      const inputPath = req.files.video[0].path;
+      const eventId = req?.query?.eventId;
+
+      const inputFileName = req.files.find((val) => val.fieldname === "video");
+      const guestsFileName = req.files.find(
+        (val) => val.fieldname === "guestNames"
+      );
+
+      inputPath = `${path.join(VIDEO_UPLOAD_DIR)}/${
+        inputFileName.originalname
+      }`;
+      const csvFilePath =
+        isSample === "true"
+          ? ""
+          : `${path.join(CSV_UPLOAD_DIR)}/${guestsFileName.originalname}`;
+
+      fs.writeFileSync(inputPath, inputFileName.buffer);
+
+      if (isSample !== "true") {
+        fs.writeFileSync(csvFilePath, guestsFileName.buffer);
+      }
+
+      if (!eventId) throw new Error("Required Event Id");
+
       const texts = JSON.parse(textProperty);
 
       if (!texts || !inputPath) {
@@ -421,15 +677,27 @@ router.post(
       }
 
       let guestNames = [];
-      
+
       if (isSample === "true") {
         guestNames = [
           { name: "pawan", mobile: "84145874" },
-          // { name: "sanjay", mobile: "4258454" },
+          { name: "sanjay", mobile: "4258454" },
         ];
       } else {
         guestNames = await processCsvFile(csvFilePath);
       }
+
+      const zipFilename = `processed_videos_${Date.now()}.zip`;
+      const zipPath = path.join(UPLOAD_DIR, zipFilename);
+
+      const output = fs.createWriteStream(zipPath);
+      const archive = archiver("zip", { zlib: { level: 9 } });
+
+      archive.on("error", (err) => {
+        throw err;
+      });
+
+      archive.pipe(output);
 
       const videoFilenames = await Promise.all(
         guestNames.map(
@@ -446,18 +714,6 @@ router.post(
         )
       );
 
-      const zipFilename = `processed_videos_${Date.now()}.zip`;
-      const zipPath = path.join(UPLOAD_DIR, zipFilename);
-
-      const output = fs.createWriteStream(zipPath);
-      const archive = archiver("zip", { zlib: { level: 9 } });
-
-      archive.on("error", (err) => {
-        throw err;
-      });
-
-      archive.pipe(output);
-
       videoFilenames.forEach((filename) => {
         const filePath = path.join(UPLOAD_DIR, filename);
         archive.file(filePath, { name: filename });
@@ -467,9 +723,9 @@ router.post(
 
       output.on("close", () => {
         res.status(200).json({
-          zipUrl: `${req.protocol}://${req.get("host")}/uploads/${zipFilename}`,
+          zipUrl: `${req.protocol}://${req.get("host")}/tmp/${zipFilename}`,
           videoUrls: videoFilenames.map((filename) => ({
-            link: `${req.protocol}://${req.get("host")}/uploads/${filename}`,
+            link: `${req.protocol}://${req.get("host")}/tmp/${filename}`,
             name: "dummy name",
           })),
         });
@@ -477,7 +733,7 @@ router.post(
     } catch (error) {
       res.status(500).json({ error: error.message });
     } finally {
-      fs.unlinkSync(req.files.video[0].path); // Clean up the uploaded video file
+      fs.unlinkSync(inputPath); // Clean up the uploaded video file
     }
   }
 );
@@ -485,7 +741,6 @@ router.post(
 module.exports = router;
 
 //////////////////////////////////////////////////////////////////////////
-
 
 // const express = require("express");
 // const multer = require("multer");
@@ -583,7 +838,7 @@ module.exports = router;
 
 //       const imagePath = path.join(IMAGE_UPLOAD_DIR, `text_image_${i}_${index}.png`);
 //       const videoPath = path.join(VIDEO_UPLOAD_DIR, `text_video_${i}_${index}.mp4`);
-      
+
 //       // Save the canvas stream as an image
 //       const base64Data = canvasStream.replace(/^data:image\/png;base64,/, "");
 //       fs.writeFileSync(imagePath, base64Data, 'base64');

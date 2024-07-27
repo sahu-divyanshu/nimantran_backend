@@ -20,17 +20,17 @@ const { getStorage } = require("firebase/storage");
 //   measurementId: "G-JFKXGF4M84"
 // };
 
-// test
 const firebaseConfig = {
-  apiKey: "AIzaSyBnSpVtIyB6ziqfeJOFyrVpeTCjFm44z6w",
-  authDomain: "nimantran-test.firebaseapp.com",
-  projectId: "nimantran-test",
-  storageBucket: "nimantran-test.appspot.com",
-  messagingSenderId: "473742912980",
-  appId: "1:473742912980:web:e52cb3989e446c903a7a41",
-  measurementId: "G-LB8J5GDJR4",
+  apiKey: process.env.API_KEY,
+  authDomain: process.env.AUTH_DOMAIN,
+  projectId: process.env.PROJECT_ID,
+  storageBucket: process.env.STORAGE_BUCKET,
+  messagingSenderId: process.env.MESSAGING_SENDER_ID,
+  appId: process.env.API_ID,
+  measurementId: process.env.MEASUREMENT_ID,
 };
 
+console.log(process.env.API_KEY)
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 // const analytics = getAnalytics(app);

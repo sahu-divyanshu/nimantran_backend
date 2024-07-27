@@ -2,8 +2,10 @@ const axios = require("axios");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
+const { createCanvas, registerFont, deregisterAllFonts } = require("canvas");
+const {Event} = require("../models/Event");
 
-const TEMP_DIR = os.tmpdir() || "/tmp"
+const TEMP_DIR = os.tmpdir() || "/tmp";
 
 const FONT_DIR = path.join(TEMP_DIR, "fonts");
 
@@ -40,4 +42,95 @@ const downloadGoogleFont = async (fontFamily) => {
   return fontFilePath;
 };
 
-module.exports = { downloadGoogleFont };
+const addOrUpdateGuests = async (eventId, guests) => {
+  try {
+    const event = await Event.findById(eventId);
+    if (!event) {
+      throw new Error("Event not found");
+    }
+
+    guests.forEach((guest) => {
+      const existingGuestIndex = event.guests.findIndex(
+        (g) => g.mobileNumber === guest.mobileNumber
+      );
+
+      if (existingGuestIndex !== -1) {
+        event.guests[existingGuestIndex].name = guest.name;
+        event.guests[existingGuestIndex].imageUrl =
+          event.guests[existingGuestIndex].imageUrl || guest.link;
+      } else {
+        event.guests.push({
+          name: guest.name,
+          mobileNumber: guest.mobileNumber,
+          // pdfUrl: guest.pdfUrl || undefined,
+          imageUrl: guest.link || undefined,
+          // videoUrl: guest.videoUrl || undefined,
+        });
+      }
+    });
+
+    const updatedEvent = await event.save();
+    return updatedEvent;
+  } catch (error) {
+    console.error("Error in addOrUpdateGuests:", error);
+    throw error;
+  }
+};
+
+const createCanvasWithCenteredText = async (
+  val,
+  property,
+  scalingFont,
+  scalingH,
+  scalingW
+) => {
+  const fontPath = await downloadGoogleFont(property.fontFamily);
+
+  let fontSize = parseInt(property.fontSize * scalingFont);
+
+  const fontInfo = `${property.fontStyle === "italic" && "italic"} ${
+    property.fontWeight
+  } ${fontSize}px ${property.fontFamily}`;
+
+  registerFont(fontPath, { family: fontInfo });
+
+  let tempTextName = property.text.replace(
+    /{(\w+)}/g,
+    (match, p1) => val[p1] || ""
+  );
+
+  const width = property.size.width * scalingW;
+  const height = property.size.height * scalingH;
+  const canvas = createCanvas(width, height);
+  const ctx = canvas.getContext("2d");
+
+  if (property.backgroundColor !== "none") {
+    ctx.fillStyle = property.backgroundColor;
+    ctx.fillRect(0, 0, width, height);
+  }
+
+  ctx.fillStyle = property.fontColor;
+  ctx.font = fontInfo;
+
+  while (ctx.measureText(tempTextName).width > width && fontSize > 1) {
+    fontSize--;
+    ctx.font = fontInfo;
+  }
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  const x = width / 2;
+  const y = height / 2;
+  ctx.fillText(tempTextName, x, y);
+
+  // deregisterAllFonts();
+
+  return canvas.toBuffer();
+};
+
+module.exports = {
+  downloadGoogleFont,
+  addOrUpdateGuests,
+  createCanvasWithCenteredText,
+};

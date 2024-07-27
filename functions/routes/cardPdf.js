@@ -1,92 +1,58 @@
 const express = require("express");
-const multer = require("multer");
+const { fileParser } = require("express-multipart-file-parser");
 const fs = require("fs");
 const path = require("path");
 const archiver = require("archiver");
-const { createCanvas, registerFont, deregisterAllFonts } = require("canvas");
 const csv = require("csv-parser");
 const { PDFDocument } = require("pdf-lib");
+const os = require('os');
+const {
+  createCanvasWithCenteredText,
+  addOrUpdateGuests
+} = require("../utility/proccessing");
+const createTransaction = require("../utility/creditTransiction");
+const { ref, uploadBytes, getDownloadURL } = require("firebase/storage");
+const { app, firebaseStorage } = require("../firebaseConfig");
+const { authenticateJWT } = require("../middleware/auth");
 
 const router = express.Router();
 
-let OUTPUT_FILENAME = "";
-const UPLOAD_DIR = path.join(__dirname, "../tmp");
+const UPLOAD_DIR = os.tmpdir() || "/tmp";
 const PDF_UPLOAD_DIR = path.join(UPLOAD_DIR, "video");
 const CSV_UPLOAD_DIR = path.join(UPLOAD_DIR, "guestNames");
-const FONT_DIR = path.join(__dirname, "../fonts");
 
-if (!fs.existsSync(UPLOAD_DIR)) {
-  fs.mkdirSync(UPLOAD_DIR);
+if (!fs.existsSync(PDF_UPLOAD_DIR)) {
+  fs.mkdirSync(PDF_UPLOAD_DIR);
 }
-if (!fs.existsSync(FONT_DIR)) {
-  fs.mkdirSync(FONT_DIR);
-}
+
 if (!fs.existsSync(CSV_UPLOAD_DIR)) {
   fs.mkdirSync(CSV_UPLOAD_DIR);
 }
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    if (file.fieldname === "guestNames") {
-      cb(null, CSV_UPLOAD_DIR);
-    } else if (file.fieldname === "pdf") {
-      cb(null, PDF_UPLOAD_DIR);
-    }
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname));
-  },
-});
-
-const upload = multer({ storage });
-
-const createCanvasWithCenteredText = (
-  val,
-  property,
-  scalingFont,
-  scalingH,
-  scalingW
+const uploadFileToFirebase = async (
+  fileBuffer,
+  filename,
+  clientId,
+  isSample,
+  i
 ) => {
-  registerFont(path.join(FONT_DIR, `${property.fontFamily}.ttf`), {
-    family: property.fontFamily,
-  });
-
-  let tempTextName = property.text.replace(
-    /{(\w+)}/g,
-    (match, p1) => val[p1] || ""
-  );
-
-  const width = property.size.width * scalingW;
-  const height = property.size.height * scalingH;
-  const canvas = createCanvas(width, height);
-  const ctx = canvas.getContext("2d");
-
-  if (property.backgroundColor !== "none") {
-    ctx.fillStyle = property.backgroundColor;
-    ctx.fillRect(0, 0, width, height);
+  try {
+    let storageRef;
+    if (isSample === "true") {
+      storageRef = ref(
+        firebaseStorage,
+        `sample/sample${i}${i === "zip" ? ".zip" : ".pdf"}`
+      );
+    } else {
+      storageRef = ref(firebaseStorage, `uploads/${clientId}/${filename}`);
+    }
+    const snapshot = await uploadBytes(storageRef, fileBuffer);
+    const downloadURL = await getDownloadURL(snapshot.ref);
+    return downloadURL;
+  } catch (error) {
+    console.error("Error uploading file to Firebase:", error);
+    throw error;
   }
-
-  ctx.fillStyle = property.fontColor;
-
-  let fontSize = property.fontSize * scalingFont;
-  ctx.font = `${fontSize}px ${property.fontFamily}`;
-  
-  // Adjust font size to fit text within canvas width
-  while (ctx.measureText(tempTextName).width > width && fontSize > 1) {
-    fontSize--;
-    ctx.font = `${fontSize}px ${property.fontFamily}`;
-  }
-
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-
-  const x = width / 2;
-  const y = height / 2;
-  ctx.fillText(tempTextName, x, y);
-
-  deregisterAllFonts();
-
-  return canvas.toDataURL();
 };
 
 const createPdfForGuest = async (
@@ -99,72 +65,39 @@ const createPdfForGuest = async (
   i
 ) => {
   try {
-
-    texts.forEach((text) => {
-      text.stream = createCanvasWithCenteredText(
-        val,
-        text,
-        scalingFont,
-        scalingH,
-        scalingW
-      );
+    const streams = await Promise.all(
+      texts.map((text) =>
+        createCanvasWithCenteredText(val, text, scalingFont, scalingH, scalingW)
+      )
+    );
+    streams.forEach((stream, index) => {
+      texts[index].stream = stream;
     });
-    
+
     const inputPdf = await fs.promises.readFile(inputPath);
     const pdfDoc = await PDFDocument.load(inputPdf);
 
     const pages = pdfDoc.getPages();
 
     for (const text of texts) {
-      const tempTextName = text.text.replace(
-        /{(\w+)}/g,
-        (match, p1) => val[p1] || ""
-      );
-
-      const width = text.size.width * scalingW;
-      const height = text.size.height * scalingH;
-      const canvas = createCanvas(width, height);
-      const ctx = canvas.getContext("2d");
-
-      if (text.backgroundColor !== "none") {
-        ctx.fillStyle = text.backgroundColor;
-        ctx.fillRect(0, 0, width, height);
-      }
-
-      ctx.fillStyle = text.fontColor;
-      ctx.font = `${text.fontSize * scalingFont}px ${text.fontFamily}`;
-
-      let fontSize = text.fontSize * scalingFont;
-      ctx.font = `${fontSize}px ${text.fontFamily}`;
-
-      // Adjust font size to fit text within canvas width
-      while (ctx.measureText(tempTextName).width > width && fontSize > 1) {
-        fontSize--;
-        ctx.font = `${fontSize}px ${text.fontFamily}`;
-      }
-
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-
-      const x = width / 2;
-      const y = height / 2;
-      ctx.fillText(tempTextName, x, y);
-
-      const img = await pdfDoc.embedPng(canvas.toDataURL());
-
+      const img = await pdfDoc.embedPng(text.stream);
       const page = pages[text.page];
+
       page.drawImage(img, {
         x: text.position.x * scalingW,
-        y: page.getHeight() - text.position.y * scalingH - height,
+        y:
+          page.getHeight() -
+          text.position.y * scalingH -
+          text.size.height * scalingH,
       });
     }
 
     const pdfBytes = await pdfDoc.save();
-    let outputFile = `processed_pdf_${i}_${Date.now()}_${OUTPUT_FILENAME}`;
-    const outputPath = path.join(UPLOAD_DIR, outputFile);
-    await fs.promises.writeFile(outputPath, pdfBytes);
+    // let outputFile = `processed_pdf_${i}_${Date.now()}_${OUTPUT_FILENAME}`;
+    // const outputPath = path.join(UPLOAD_DIR, outputFile);
+    // await fs.promises.writeFile(outputPath, pdfBytes);
 
-    return outputFile;
+    return pdfBytes;
   } catch (error) {
     throw error;
   }
@@ -186,19 +119,36 @@ const processCsvFile = (csvFilePath) => {
 
 router.post(
   "/",
-  upload.fields([
-    { name: "pdf", maxCount: 1 },
-    { name: "guestNames", maxCount: 1 },
-  ]),
+  authenticateJWT,
+  fileParser({ rawBodyOptions: { limit: "100mb" } }),
   async (req, res) => {
+    let inputPath;
     try {
-      const { textProperty, scalingFont, scalingW, scalingH, isSample } = req.body;
+      const { textProperty, scalingFont, scalingW, scalingH, isSample } =
+        req.body;
 
-      console.log("vvvvvvv", isSample)
+      const eventId = req?.query?.eventId;
+      
+      const inputFileName = req.files.find((val) => val.fieldname === "pdf");
+      const guestsFileName = req.files.find(
+        (val) => val.fieldname === "guestNames"
+      );
 
-      const csvFilePath = isSample === "true" ? "" : req.files.guestNames[0].path;
-      const inputPath = req.files.pdf[0].path;
-      OUTPUT_FILENAME = req.files.pdf[0].filename;
+      inputPath = `${path.join(PDF_UPLOAD_DIR)}/${
+        inputFileName.originalname
+      }`;
+
+      const csvFilePath =
+        isSample === "true"
+          ? ""
+          : `${path.join(CSV_UPLOAD_DIR)}/${guestsFileName.originalname}`;
+
+      fs.writeFileSync(inputPath, inputFileName.buffer);
+
+      if (isSample !== "true") {
+        fs.writeFileSync(csvFilePath, guestsFileName.buffer);
+      }
+      
       const texts = JSON.parse(textProperty);
 
       if (!texts || !inputPath) {
@@ -211,26 +161,13 @@ router.post(
       if (isSample === "true") {
         guestNames = [
           { name: "pawan", mobile: "84145874" },
-          // { name: "sanjay", mobile: "4258454" },
+          { name: "sanjay", mobile: "4258454" },
         ];
       } else {
         guestNames = await processCsvFile(csvFilePath);
       }
-      const videoFilenames = await Promise.all(
-        guestNames.map((val, i) =>
-          createPdfForGuest(
-            inputPath,
-            texts,
-            scalingFont,
-            scalingH,
-            scalingW,
-            val,
-            i
-          )
-        )
-      );
 
-      const zipFilename = `processed_videos_${Date.now()}.zip`;
+      const zipFilename = `processed_pdfs_${Date.now()}.zip`;
       const zipPath = path.join(UPLOAD_DIR, zipFilename);
 
       const output = fs.createWriteStream(zipPath);
@@ -242,25 +179,72 @@ router.post(
 
       archive.pipe(output);
 
-      videoFilenames.forEach((filename) => {
-        const filePath = path.join(UPLOAD_DIR, filename);
-        archive.file(filePath, { name: filename });
-      });
+      const videoFilenames = await Promise.all(
+        guestNames.map(async (val, i) => {
+          const buffer = await createPdfForGuest(
+            inputPath,
+            texts,
+            scalingFont,
+            scalingH,
+            scalingW,
+            val,
+            i
+          );
+
+          const filename = `processed_pdf_${i}_${Date.now()}.pdf`;
+          archive.append(new Buffer.from(buffer), { name: filename });
+
+          const url = await uploadFileToFirebase(
+            buffer,
+            filename,
+            req.user._id,
+            isSample,
+            i
+          );
+          val.link = url;
+          return url;
+        })
+      );
 
       await archive.finalize();
-      output.on("close", () => {
-        res.status(201).json({
-          zipUrl: `${req.protocol}://${req.get("host")}/uploads/${zipFilename}`,
-          videoUrls: videoFilenames.map(
-            (filename) => `${req.protocol}://${req.get("host")}/uploads/${filename}`
-          ),
+
+      output.on("close", async () => {
+        const zipBuffer = fs.readFileSync(zipPath);
+        const zipUrl = await uploadFileToFirebase(
+          zipBuffer,
+          zipFilename,
+          req.user._id,
+          isSample,
+          "zip"
+        );
+        fs.unlinkSync(zipPath);
+
+        if (isSample !== "true") {
+
+          await addOrUpdateGuests(eventId, guestNames);
+
+          const amountSpend = 0.5 * guestNames.length;
+          await createTransaction(
+            "pdf",
+            req.user._id,
+            null,
+            amountSpend,
+            "completed",
+            eventId
+          );
+        }
+
+        res.status(200).json({
+          zipUrl,
+          videoUrls: guestNames,
         });
       });
+
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: "PDF processing failed" });
     } finally {
-      fs.unlinkSync(req.files.pdf[0].path); // Clean up the uploaded PDF file
+      fs.unlinkSync(inputPath); // Clean up the uploaded PDF file
     }
   }
 );

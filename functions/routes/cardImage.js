@@ -3,17 +3,15 @@ const { fileParser } = require("express-multipart-file-parser");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { createCanvas, registerFont, deregisterAllFonts } = require("canvas");
 const csv = require("csv-parser");
 const sharp = require("sharp");
 const { authenticateJWT } = require("../middleware/auth");
 const createTransaction = require("../utility/creditTransiction");
-const { User } = require("../models/User");
 const { app, firebaseStorage } = require("../firebaseConfig");
 const { ref, uploadBytes, getDownloadURL } = require("firebase/storage");
 const {
-  downloadGoogleFont,
   addOrUpdateGuests,
+  createCanvasWithCenteredText,
 } = require("../utility/proccessing");
 const archiver = require("archiver");
 
@@ -30,56 +28,6 @@ if (!fs.existsSync(VIDEO_UPLOAD_DIR)) {
 if (!fs.existsSync(CSV_UPLOAD_DIR)) {
   fs.mkdirSync(CSV_UPLOAD_DIR);
 }
-
-const createCanvasWithCenteredText = async (
-  val,
-  property,
-  scalingFont,
-  scalingH,
-  scalingW
-) => {
-  const fontPath = await downloadGoogleFont(property.fontFamily);
-  let fontSize = parseInt(property.fontSize * scalingFont);
-  const fontInfo = `${property.fontStyle === "italic" && "italic"} ${
-    property.fontWeight
-  } ${fontSize}px ${property.fontFamily}`;
-
-  registerFont(fontPath, { family: fontInfo });
-
-  let tempTextName = property.text.replace(
-    /{(\w+)}/g,
-    (match, p1) => val[p1] || ""
-  );
-
-  const width = property.size.width * scalingW;
-  const height = property.size.height * scalingH;
-  const canvas = createCanvas(width, height);
-  const ctx = canvas.getContext("2d");
-
-  if (property.backgroundColor !== "none") {
-    ctx.fillStyle = property.backgroundColor;
-    ctx.fillRect(0, 0, width, height);
-  }
-
-  ctx.fillStyle = property.fontColor;
-  ctx.font = fontInfo;
-
-  while (ctx.measureText(tempTextName).width > width && fontSize > 1) {
-    fontSize--;
-    ctx.font = fontInfo;
-  }
-
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-
-  const x = width / 2;
-  const y = height / 2;
-  ctx.fillText(tempTextName, x, y);
-
-  // deregisterAllFonts();
-
-  return canvas.toBuffer();
-};
 
 const createImagesForGuest = async (
   inputPath,
@@ -176,6 +124,9 @@ router.post(
     try {
       const { textProperty, scalingFont, scalingW, scalingH, isSample } =
         req.body;
+
+      const eventId = req?.query?.eventId;
+
       const inputFileName = req.files.find((val) => val.fieldname === "video");
       const guestsFileName = req.files.find(
         (val) => val.fieldname === "guestNames"
@@ -194,8 +145,6 @@ router.post(
       if (isSample !== "true") {
         fs.writeFileSync(csvFilePath, guestsFileName.buffer);
       }
-
-      const eventId = req?.query?.eventId;
 
       if (!eventId) throw new Error("Required Event Id");
 
@@ -273,7 +222,7 @@ router.post(
         if (isSample !== "true") {
           await addOrUpdateGuests(eventId, guestNames);
 
-          const amountSpend = 2;
+          const amountSpend = 0.25 * guestNames.length;
           await createTransaction(
             "image",
             req.user._id,
@@ -291,7 +240,7 @@ router.post(
       });
     } catch (error) {
       console.error(error);
-      res.status(400).json({ error: "Video processing failed" });
+      res.status(400).json({ error: "Image processing failed" });
     } finally {
       fs.unlinkSync(inputPath);
     }
