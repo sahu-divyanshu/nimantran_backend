@@ -56,14 +56,14 @@ const addOrUpdateGuests = async (eventId, guests) => {
 
       if (existingGuestIndex !== -1) {
         event.guests[existingGuestIndex].name = guest.name;
-        event.guests[existingGuestIndex].imageUrl =
-          event.guests[existingGuestIndex].imageUrl || guest.link;
+        event.guests[existingGuestIndex].link =
+          event.guests[existingGuestIndex].link || guest.link;
       } else {
         event.guests.push({
           name: guest.name,
           mobileNumber: guest.mobileNumber,
           // pdfUrl: guest.pdfUrl || undefined,
-          imageUrl: guest.link || undefined,
+          link: guest.link || undefined,
           // videoUrl: guest.videoUrl || undefined,
         });
       }

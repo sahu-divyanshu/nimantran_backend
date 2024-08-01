@@ -78,7 +78,7 @@ const createImagesForGuest = async (
 const uploadFileToFirebase = async (
   fileBuffer,
   filename,
-  clientId,
+  eventId,
   isSample,
   i
 ) => {
@@ -90,7 +90,7 @@ const uploadFileToFirebase = async (
         `sample/sample${i}${i === "zip" ? ".zip" : ".png"}`
       );
     } else {
-      storageRef = ref(firebaseStorage, `uploads/${clientId}/${filename}`);
+      storageRef = ref(firebaseStorage, `uploads/${eventId}/${filename}`);
     }
     const snapshot = await uploadBytes(storageRef, fileBuffer);
     const downloadURL = await getDownloadURL(snapshot.ref);
@@ -197,7 +197,7 @@ router.post(
           const url = await uploadFileToFirebase(
             buffer,
             filename,
-            req.user._id,
+            eventId,
             isSample,
             i
           );
@@ -213,7 +213,7 @@ router.post(
         const zipUrl = await uploadFileToFirebase(
           zipBuffer,
           zipFilename,
-          req.user._id,
+          eventId,
           isSample,
           "zip"
         );

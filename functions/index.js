@@ -40,8 +40,8 @@ app.use("/api/transictions", transictionRoutes);
 app.use("/api/imageEdit", cardRoutes);
 app.use('/api/pdfEdit', PdfRoutes)
 
-// app.listen(8000, () => {
-//     console.log("listening")
-// })
+app.listen(8000, () => {
+    console.log("listening")
+})
 
-exports.app = functions.https.onRequest(app);
+// exports.app = functions.runWith({ timeoutSeconds: 540 }).https.onRequest(app);

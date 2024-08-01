@@ -14,6 +14,10 @@ const EventSchema = new mongoose.Schema({
     type: Date,
     required: true,
   },
+  editType: {
+    type: String, 
+    enum: ["imageEdit", "cardEdit", "videoEdit"]
+  }, 
   guests: [
     {
       _id: false,

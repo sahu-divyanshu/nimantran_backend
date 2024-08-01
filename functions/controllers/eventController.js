@@ -1,12 +1,10 @@
-const fs = require("fs");
-const csv = require("csv-parser");
 const { User } = require("../models/User");
 const { Event } = require("../models/Event");
 
 const createEvent = async (req, res) => {
-  console.log("error");
   try {
-    const { eventName, dateOfOrganising, location } = req.body;
+    const { eventName, dateOfOrganising, location, editType } = req.body;
+    console.log("..........", editType);
     const { customerId } = req.params;
     // const csvFilePath = req.file?.path;
     // const guests = csvFilePath ? await processCsvFile(csvFilePath) : [];
@@ -18,6 +16,7 @@ const createEvent = async (req, res) => {
       eventName,
       dateOfOrganising,
       location,
+      editType
     });
 
     if (!customer) {
@@ -26,12 +25,12 @@ const createEvent = async (req, res) => {
       });
     }
 
-    await event.save();
+    const response = await event.save();
     customer.events.push(event);
     await customer.save(); // Save the user after pushing the event
 
     res.status(201).json({
-      data: event.populate("customerId"),
+      data: event,
       success: true,
       message: "Event created successfully",
     });
@@ -200,38 +199,37 @@ const getAllClientEvents = async (req, res) => {
     const clientId = req.user._id;
 
     // Find the client by ID and populate the 'customers' and 'events' fields
-    const client = await User.findById(clientId)
-      .populate({
-        path: 'customers',
-        populate: {
-          path: 'events',
-          model: 'Event'
-        }
-      });
-    
+    const client = await User.findById(clientId).populate({
+      path: "customers",
+      populate: {
+        path: "events",
+        model: "Event",
+      },
+    });
+
     // Check if client and client.customers exist and are arrays
     if (client && Array.isArray(client.customers)) {
-      const allEventsWithCustomerNames = client.customers.map(customer => {
+      const allEventsWithCustomerNames = client.customers.map((customer) => {
         return {
           customerName: customer.name,
-          events: customer.events
+          events: customer.events,
         };
       });
-    console.log(allEventsWithCustomerNames);
+      console.log(allEventsWithCustomerNames);
       res.status(200).json({
         success: true,
-        data: allEventsWithCustomerNames
+        data: allEventsWithCustomerNames,
       });
     } else {
       res.status(404).json({
         success: false,
-        message: 'No customers found for this client.'
+        message: "No customers found for this client.",
       });
     }
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -261,6 +259,20 @@ const getEvent = async (req, res) => {
   }
 };
 
+const getAllGuestMedia = async (req, res) => {
+  try {
+    const eventId = req?.params?.id;
+
+    const mediaGrid = await Event.findById(eventId);
+    if(!mediaGrid) throw new Error("Event not exists");
+
+    return res.status(200).json({ data: mediaGrid });
+
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
+};
+
 module.exports = {
   createEvent,
   updatedEvent,
@@ -268,5 +280,6 @@ module.exports = {
   getAllEvents,
   getEvent,
   getAllCustomerEvents,
-  getAllClientEvents
+  getAllClientEvents,
+  getAllGuestMedia,
 };
