@@ -118,7 +118,7 @@ const processCsvFile = (csvFilePath) => {
 router.post(
   "/",
   authenticateJWT,
-  fileParser({ rawBodyOptions: { limit: "10mb" } }),
+  fileParser({ rawBodyOptions: { limit: "100mb" } }),
   async (req, res) => {
     let inputPath;
     try {
@@ -246,7 +246,5 @@ router.post(
     }
   }
 );
-
-
 
 module.exports = router;

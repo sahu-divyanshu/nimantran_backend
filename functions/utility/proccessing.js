@@ -3,7 +3,7 @@ const path = require("path");
 const fs = require("fs");
 const os = require("os");
 const { createCanvas, registerFont, deregisterAllFonts } = require("canvas");
-const {Event} = require("../models/Event");
+const { Event } = require("../models/Event");
 
 const TEMP_DIR = os.tmpdir() || "/tmp";
 
@@ -44,6 +44,7 @@ const downloadGoogleFont = async (fontFamily) => {
 
 const addOrUpdateGuests = async (eventId, guests) => {
   try {
+    console.log("..............", guests);
     const event = await Event.findById(eventId);
     if (!event) {
       throw new Error("Event not found");
@@ -57,14 +58,12 @@ const addOrUpdateGuests = async (eventId, guests) => {
       if (existingGuestIndex !== -1) {
         event.guests[existingGuestIndex].name = guest.name;
         event.guests[existingGuestIndex].link =
-          event.guests[existingGuestIndex].link || guest.link;
+          guest.link || event.guests[existingGuestIndex].link;
       } else {
         event.guests.push({
           name: guest.name,
           mobileNumber: guest.mobileNumber,
-          // pdfUrl: guest.pdfUrl || undefined,
-          link: guest.link || undefined,
-          // videoUrl: guest.videoUrl || undefined,
+          link: guest.link,
         });
       }
     });

@@ -20,14 +20,17 @@ const VIDEO_UPLOAD_DIR = path.join(UPLOAD_DIR, "video");
 const CSV_UPLOAD_DIR = path.join(UPLOAD_DIR, "guestNames");
 const TEMP_DIR = path.join(UPLOAD_DIR, "temp");
 
-if (!fs.existsSync(TEMP_DIR)) {
-  fs.mkdirSync(TEMP_DIR);
+if (!fs.existsSync(UPLOAD_DIR)) {
+  fs.mkdirSync(UPLOAD_DIR);
 }
 if (!fs.existsSync(CSV_UPLOAD_DIR)) {
   fs.mkdirSync(CSV_UPLOAD_DIR);
 }
 if (!fs.existsSync(VIDEO_UPLOAD_DIR)) {
   fs.mkdirSync(VIDEO_UPLOAD_DIR);
+}
+if (!fs.existsSync(TEMP_DIR)) {
+  fs.mkdirSync(TEMP_DIR);
 }
 
 // Helper function to save DataURL as an image file
