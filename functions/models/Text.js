@@ -2,69 +2,36 @@ const mongoose = require("mongoose");
 
 const TextSchema = new mongoose.Schema({
     backgroundColor: String,
-    duration:{
-        type:Number
+    duration: Number,
+    fontColor: String,
+    fontFamily: String,
+    fontSize: Number,
+    fontStyle: String,
+    fontWeight: String,
+    hidden: Boolean,
+    id: Number,
+    page: Number,
+    position: {
+        x: Number,
+        y: Number,
     },
-    fontColor:{
-        type:String
+    size: {
+        height: Number,
+        width: Number,
     },
-    fontFamily:{
-        type:String
+    startTime: Number,
+    text: String,
+    transition: {
+        options: Object,
+        type: String,
     },
-    fontSize:{
-        type:Number
-    },
-    fontStyle:{
-        type:String
-    },
-    fontWeight:{
-        type:String
-    },
-    hidden:{
-        type:Boolean
-    },
-    id:{
-        type:Number
-    },
-    page:{
-        type:Number
-    },
-    position:{
-        x:{
-            type:Number
-        },
-        y:{
-            type:Number
-        },
-    },
-    size:{
-        height:{ 
-            type:Number
-        },
-        width:{
-            type:Number
-        },
-    },
-    startTime:{
-        type:Number
-    },
-    text:{
-        type:String
-    },
-    transition:{
-        options:{
-            type:Object,
-        },
-        type:{
-            type:String
-        },
-    },
-    length:{
-        type:Number
-    },
+    length: Number,
+    eventId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Event"
+    }
+}, { timestamps: true });
 
-}, { timestamps: true })
+const Text = mongoose.model("Text", TextSchema);
 
-const Text = mongoose.model("Text",TextSchema)
-module.exports = {Text}
-
+module.exports = Text;
