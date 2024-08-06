@@ -1,10 +1,10 @@
 const mongoose = require("mongoose");
 
 const EventSchema = new mongoose.Schema({
-  customerId:{
-    type:mongoose.Schema.Types.ObjectId,
-    required:true,
-    ref:"User"
+  customerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    required: true,
+    ref: "User",
   },
   eventName: {
     type: String,
@@ -15,9 +15,9 @@ const EventSchema = new mongoose.Schema({
     required: true,
   },
   editType: {
-    type: String, 
-    enum: ["imageEdit", "cardEdit", "videoEdit"]
-  }, 
+    type: String,
+    enum: ["imageEdit", "cardEdit", "videoEdit"],
+  },
   guests: [
     {
       _id: false,
@@ -27,22 +27,20 @@ const EventSchema = new mongoose.Schema({
       },
       mobileNumber: {
         type: String,
-        required: true
+        required: true,
       },
-      pdfUrl:{
-        type:String,
+      link: {
+        type: String,
       },
-      imageUrl:{
-        type:String
-      },
-      videoUrl:{
-        type:String
+      sid: {
+        type: Array,
+        default: []
       }
     },
   ],
-  location:{
-    type:String,
-    required:true
+  location: {
+    type: String,
+    required: true,
   },
   active: {
     type: Boolean,
@@ -53,4 +51,4 @@ const EventSchema = new mongoose.Schema({
 
 const Event = mongoose.model("Event", EventSchema);
 
-module.exports = { Event};
+module.exports = { Event };
