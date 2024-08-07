@@ -504,7 +504,7 @@ router.post(
             isSample
           );
 
-          const filename = `processed_video_${i}_${Date.now()}.mp4`;
+          const filename = `${val?.name}_${val?.mobileNumber}.mp4`;
           archive.append(buffer, { name: filename });
 
           const url = await uploadFileToFirebase(
@@ -535,10 +535,9 @@ router.post(
         fs.unlinkSync(zipPath);
 
         if (isSample !== "true") {
-          await addOrUpdateGuests(eventId, guestNames);
-
           const amountSpend = 1 * guestNames.length;
 
+          await addOrUpdateGuests(eventId, guestNames);
           await createTransaction(
             "video",
             req.user._id,

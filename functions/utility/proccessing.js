@@ -44,7 +44,6 @@ const downloadGoogleFont = async (fontFamily) => {
 
 const addOrUpdateGuests = async (eventId, guests) => {
   try {
-    console.log("..............", guests);
     const event = await Event.findById(eventId);
     if (!event) {
       throw new Error("Event not found");
@@ -71,8 +70,7 @@ const addOrUpdateGuests = async (eventId, guests) => {
     const updatedEvent = await event.save();
     return updatedEvent;
   } catch (error) {
-    console.error("Error in addOrUpdateGuests:", error);
-    throw error;
+    return error;
   }
 };
 

@@ -1,38 +1,5 @@
 const CreditTransaction = require("../models/Credits");
-
-// areaOfUse: {
-//     type: String,
-//     enum: ['video', 'image', 'pdf','transfer'],
-//     required: true
-//   },
-//   senderId: {
-//     type: Schema.Types.ObjectId,
-//     ref: 'User',
-//     required: true
-//   },
-//   recieverId: {
-//     type: Schema.Types.ObjectId,
-//     ref: 'User',
-//     required: true
-//   },
-//   eventId: {
-//     type: Schema.Types.ObjectId,
-//     ref: 'Event',
-//     required: false
-//   },
-//   amount: {
-//     type: Number,
-//     required: true
-//   },
-//   status:{
-//     type:String,
-//     enum:['pending','rejected','accepted'],
-//     required:true
-//   },
-//   transactionDate: {
-//     type: Date,
-//     default: Date.now
-//   }
+const { User } = require("../models/User");
 
 const createTransaction = async (
   areaOfUse,
@@ -66,16 +33,24 @@ const createTransaction = async (
       eventId,
       amount,
       status,
-      transactionDatej: new Date(),
+      transactionDate: new Date(),
     });
 
     // Save the transaction to the database
-    await transaction.save();
+    const res1 = await transaction.save();
+    if (!res1) throw new Error("credit history not created");
+
+    const res2 = await User.updateOne(
+      { _id: senderId },
+      {
+        $inc: { credits: -amount },
+      }
+    );
+    if (!res2) throw new Error("Credits not cut");
 
     // Return the saved transaction
     return transaction;
   } catch (error) {
-    console.error("Error creating transaction:", error.message);
     return error;
   }
 };

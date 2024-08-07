@@ -9,8 +9,8 @@ const individualWhatsuppInvite = async (req, res) => {
   try {
     let { name, mobileNumber, link } = req.body;
     const { eventId } = req.query;
-    // mobileNumber =
-    mobileNumber?.at(0) === "+" ? mobileNumber : "+" + mobileNumber;
+    mobileNumber =
+      mobileNumber?.at(0) === "+" ? mobileNumber : "+" + mobileNumber;
 
     const messageResp = await client.messages.create({
       body: "Your appointment is coming up on July 21 at 10PM",
@@ -37,18 +37,27 @@ const individualWhatsuppInvite = async (req, res) => {
 
 const fetchWhatsappInfo = async (req, res) => {
   try {
-    client
-      .messages("SM67c7e07c84e22927014bb984c3c39eee")
-      .fetch()
-      .then((message) => {
-        console.log(`Message SID: ${message.sid}`);
-        console.log(`Message Status: ${message.status}`);
-        console.log(`Error Code: ${message.errorCode}`);
-        console.log(`Error Message: ${message.errorMessage}`);
-      });
-  } catch (error) {}
+    const { eventId } = req.query;
+    const guests = await Event.findById(eventId)?.select("guests");
+    if (!guests) throw new Error("Event not Found");
+
+    const fetchedMessages = await Promise.all(
+      guests?.guests?.map(async (guest) => {
+        const populateGuests = await Promise.all(
+          guest?.sid?.map(async (sid) => {
+            const message = await client.messages(sid).fetch();
+            return message;
+          })
+        );
+        guest.sid = populateGuests;
+        return guest;
+      })
+    );
+
+    return res.status(200).json({ data: fetchedMessages });
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
 };
 
-// fetchWhatsappInfo();
-
-module.exports = { individualWhatsuppInvite };
+module.exports = { individualWhatsuppInvite, fetchWhatsappInfo };

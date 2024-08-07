@@ -179,7 +179,7 @@ router.post(
 
       archive.pipe(output);
 
-      const videoFilenames = await Promise.all(
+      await Promise.all(
         guestNames.map(async (val, i) => {
           const buffer = await createPdfForGuest(
             inputPath,
@@ -191,7 +191,7 @@ router.post(
             i
           );
 
-          const filename = `processed_pdf_${i}_${Date.now()}.pdf`;
+          const filename = `${val?.name}_${val?.mobileNumber}.pdf`;
           archive.append(new Buffer.from(buffer), { name: filename });
 
           const url = await uploadFileToFirebase(
@@ -220,10 +220,9 @@ router.post(
         fs.unlinkSync(zipPath);
 
         if (isSample !== "true") {
+          const amountSpend = 0.5 * guestNames.length;
 
           await addOrUpdateGuests(eventId, guestNames);
-
-          const amountSpend = 0.5 * guestNames.length;
           await createTransaction(
             "pdf",
             eventId,

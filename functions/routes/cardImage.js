@@ -14,6 +14,7 @@ const {
   createCanvasWithCenteredText,
 } = require("../utility/proccessing");
 const archiver = require("archiver");
+const { User } = require("../models/User");
 
 const router = express.Router();
 
@@ -179,7 +180,7 @@ router.post(
 
       archive.pipe(output);
 
-      const uploadedUrls = await Promise.all(
+      await Promise.all(
         guestNames.map(async (val, i) => {
           const buffer = await createImagesForGuest(
             inputPath,
@@ -191,7 +192,7 @@ router.post(
             i
           );
 
-          const filename = `processed_img_${i}_${Date.now()}.png`;
+          const filename = `${val?.name}_${val?.mobileNumber}.png`;
           archive.append(buffer, { name: filename });
 
           const url = await uploadFileToFirebase(
@@ -208,6 +209,8 @@ router.post(
 
       await archive.finalize();
 
+      console.log(".....................................")
+
       output.on("close", async () => {
         const zipBuffer = fs.readFileSync(zipPath);
         const zipUrl = await uploadFileToFirebase(
@@ -220,9 +223,10 @@ router.post(
         fs.unlinkSync(zipPath);
 
         if (isSample !== "true") {
+          const amountSpend = 0.25 * guestNames.length;
+
           await addOrUpdateGuests(eventId, guestNames);
 
-          const amountSpend = 0.25 * guestNames.length;
           await createTransaction(
             "image",
             req.user._id,
