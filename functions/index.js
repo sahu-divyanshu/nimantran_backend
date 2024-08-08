@@ -4,18 +4,17 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 dotenv.config();
 
-
 const connectDB = require("./config/db");
 const userRoutes = require("./routes/userRoutes");
 const clientRoutes = require("./routes/clientRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const customerRoutes = require("./routes/customerRoutes");
 const cardRoutes = require("./routes/cardImage");
-const videoRoutes = require('./routes/videoRoutes');
-const PdfRoutes = require('./routes/cardPdf');
+const videoRoutes = require("./routes/videoRoutes");
+const PdfRoutes = require("./routes/cardPdf");
 const eventRoutes = require("./routes/eventRoutes");
 const transictionRoutes = require("./routes/TransictionRoutes");
-const whatsappRoutes = require("./routes/whatSuppRoutes")
+const whatsappRoutes = require("./routes/whatSuppRoutes");
 const app = express();
 
 connectDB();
@@ -25,9 +24,8 @@ app.use(express.json());
 app.use("/tmp", express.static("tmp"));
 app.use(express.urlencoded({ extended: true }));
 
-
 app.get("/", (req, res) => {
-    res.json("server started ....");
+  res.json("Again 2 server started ....");
 });
 
 app.use("/api/admin", adminRoutes);
@@ -38,12 +36,14 @@ app.use("/api/customers", customerRoutes);
 app.use("/api/transictions", transictionRoutes);
 app.use("/api/whatsapp", whatsappRoutes);
 
-app.use('/api/videoEdit', videoRoutes);
+app.use("/api/videoEdit", videoRoutes);
 app.use("/api/imageEdit", cardRoutes);
-app.use('/api/pdfEdit', PdfRoutes)
+app.use("/api/pdfEdit", PdfRoutes);
 
-// app.listen(8000, () => {
-//     console.log("listening")
-// })
+app.listen(8000, () => {
+    console.log("listening")
+})
 
-exports.app = functions.runWith({ timeoutSeconds: 540 }).https.onRequest(app);
+// exports.app = functions
+//   .runWith({ timeoutSeconds: 540, memory: '8GB' })
+//   .https.onRequest(app);

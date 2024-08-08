@@ -14,7 +14,6 @@ const {
   createCanvasWithCenteredText,
 } = require("../utility/proccessing");
 const archiver = require("archiver");
-const { User } = require("../models/User");
 
 const router = express.Router();
 
@@ -119,7 +118,7 @@ const processCsvFile = (csvFilePath) => {
 router.post(
   "/",
   authenticateJWT,
-  fileParser({ rawBodyOptions: { limit: "100mb" } }),
+  fileParser({ rawBodyOptions: { limit: "500mb" } }),
   async (req, res) => {
     let inputPath;
     try {
@@ -208,8 +207,6 @@ router.post(
       );
 
       await archive.finalize();
-
-      console.log(".....................................")
 
       output.on("close", async () => {
         const zipBuffer = fs.readFileSync(zipPath);
