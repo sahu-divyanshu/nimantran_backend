@@ -4,6 +4,7 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 dotenv.config();
 
+const textRoutes = require("./routes/textRoutes")
 
 const connectDB = require("./config/db");
 const userRoutes = require("./routes/userRoutes");
@@ -39,6 +40,8 @@ app.use("/api/transictions", transictionRoutes);
 // app.use('/api/videoEdit', videoRoutes);
 app.use("/api/imageEdit", cardRoutes);
 app.use('/api/pdfEdit', PdfRoutes)
+
+app.use("/api/",textRoutes)
 
 app.listen(8000, () => {
     console.log("listening")

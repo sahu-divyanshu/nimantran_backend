@@ -1,6 +1,7 @@
-const { authenticateJWT } = require("../middleware/auth.js");
-const Text = require("../models/Text.js");
-const { Text } = require("../models/Text.js");
+
+const mongoose = require("mongoose");
+const { Text } = require("../models/Text");
+
 
 const saveText = async (req, res) => {
     const {
@@ -46,6 +47,8 @@ const saveText = async (req, res) => {
             eventId
         });
 
+     
+
         if (!textUpload) {
             return res.status(400).json({ message: "Error uploading text" });
         }
@@ -60,15 +63,15 @@ const saveText = async (req, res) => {
 
 
 
-const mongoose = require("mongoose");
-const { Text } = require("../models/Text.js");
+
+
 
 const getTexts = async (req, res) => {
-    const user = req.user?._id;
-    const { eventId } = req.params;
+    // const user = req.user?._id;
+    const { eventId } = req.query;
     
     if (!eventId) return res.status(400).json({ message: "Event ID not found" });
-    if (!user) return res.status(400).json({ message: "User not found" });
+    // if (!user) return res.status(400).json({ message: "User not found" });
 
     try {
         const texts = await Text.aggregate([
