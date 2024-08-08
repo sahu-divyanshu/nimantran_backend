@@ -7,7 +7,6 @@ const {
   registerUser,
   loginUser,
   purchaseRequestFromClient,
-  performFunction,
   getUser,
 } = require("../controllers/userController");
 

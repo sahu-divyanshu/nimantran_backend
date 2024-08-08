@@ -22,7 +22,7 @@ const RequestSchema = new mongoose.Schema({
 const UserSchema = new mongoose.Schema({
   name:{
     type:String,
-    required: true,
+    // required: true,
   },
   mobile: {
     type: String,
@@ -33,10 +33,10 @@ const UserSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  email:{
-    type:String,
-    required: true
-  },
+  // email:{
+  //   type:String,
+  //   required: false
+  // },
   dateOfBirth:{
     type:Date,
     required: function () {

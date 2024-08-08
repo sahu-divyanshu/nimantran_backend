@@ -36,14 +36,12 @@ const registerUser = async (req, res) => {
     // Check if the user already exists
     const existingUser = await User.findOne({ mobile });
     if (existingUser) {
-      return res
-        .status(400)
-        .json({ message: "User already exists" });
+      return res.status(400).json({ message: "User already exists" });
     }
 
     // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
-    
+
     // Create new user
     const newUser = new User({
       mobile,
@@ -61,7 +59,9 @@ const registerUser = async (req, res) => {
     res.status(200).json({ message: `${role} registered successfully` });
   } catch (error) {
     console.error("Error registering user:", error); // Log the error for debugging
-    res.status(500).json({ message: "Something went wrong. Please try again later." });
+    res
+      .status(500)
+      .json({ message: "Something went wrong. Please try again later." });
   }
 };
 
@@ -149,12 +149,9 @@ const purchaseRequestFromClient = async (req, res) => {
   }
 };
 
-
- 
 module.exports = {
   getUser,
   registerUser,
   loginUser,
   purchaseRequestFromClient,
-
 };
