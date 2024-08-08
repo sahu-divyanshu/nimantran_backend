@@ -12,14 +12,14 @@ const TextSchema = new mongoose.Schema({
     id: Number,
     page: Number,
     position: {
-        x: Number,
-        y: Number,
+        x: mongoose.Schema.Types.Decimal128,
+        y: mongoose.Schema.Types.Decimal128,
     },
     size: {
-        height: Number,
-        width: Number,
+        height: mongoose.Schema.Types.Decimal128,
+        width: mongoose.Schema.Types.Decimal128,
     },
-    startTime: Number,
+    startTime: mongoose.Schema.Types.Decimal128,
     text: String,
     transition: {
         options: Object,
@@ -34,4 +34,4 @@ const TextSchema = new mongoose.Schema({
 
 const Text = mongoose.model("Text", TextSchema);
 
-module.exports = Text;
+module.exports = {Text};
