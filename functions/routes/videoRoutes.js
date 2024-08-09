@@ -110,25 +110,6 @@ const createCanvasWithCenteredText = async (
   deregisterAllFonts();
 
   return canvas.toDataURL();
-
-  // const dataURL = canvas.toDataURL();
-
-  // // Save image and convert to video
-  // const imageFilePath = path.join(TEMP_DIR, `text_overlay_${Date.now()}.png`);
-  // const videoFilePath = path.join(TEMP_DIR, `text_overlay_${Date.now()}.mp4`);
-
-  // saveDataURLAsImage(dataURL, imageFilePath);
-
-  // await convertImageToVideo(
-  //   imageFilePath,
-  //   videoFilePath,
-  //   property.duration - property.startTime
-  // );
-
-  // // Clean up the temporary image file
-  // fs.unlinkSync(imageFilePath);
-
-  // return videoFilePath;
 };
 
 const createVideoForGuest = (
