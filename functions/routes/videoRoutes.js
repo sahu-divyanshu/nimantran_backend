@@ -25,26 +25,13 @@ const router = express.Router();
 const UPLOAD_DIR = os.tmpdir() || "/tmp";
 const VIDEO_UPLOAD_DIR = path.join(UPLOAD_DIR, "video");
 const CSV_UPLOAD_DIR = path.join(UPLOAD_DIR, "guestNames");
-// const TEMP_DIR = path.join(UPLOAD_DIR, "temp");
 
-// if (!fs.existsSync(UPLOAD_DIR)) {
-//   fs.mkdirSync(UPLOAD_DIR);
-// }
 if (!fs.existsSync(CSV_UPLOAD_DIR)) {
   fs.mkdirSync(CSV_UPLOAD_DIR);
 }
 if (!fs.existsSync(VIDEO_UPLOAD_DIR)) {
   fs.mkdirSync(VIDEO_UPLOAD_DIR);
 }
-// if (!fs.existsSync(TEMP_DIR)) {
-//   fs.mkdirSync(TEMP_DIR);
-// }
-
-// Helper function to save DataURL as an image file
-const saveDataURLAsImage = (dataURL, filePath) => {
-  const base64Data = dataURL.replace(/^data:image\/png;base64,/, "");
-  fs.writeFileSync(filePath, base64Data, "base64");
-};
 
 const uploadFileToFirebase = async (
   fileBuffer,
@@ -70,31 +57,6 @@ const uploadFileToFirebase = async (
     console.error("Error uploading file to Firebase:", error);
     throw error;
   }
-};
-
-const convertImageToVideo = (imagePath, videoPath, duration = 2) => {
-  return new Promise((resolve, reject) => {
-    ffmpeg(imagePath)
-      .loop(duration) // Set video duration
-      .outputOptions([
-        "-pix_fmt yuva420p", // Ensure compatibility with transparency
-        "-c:v libx264", // Use the H.264 codec
-        "-crf 18", // Set the quality (lower is better)
-        "-preset veryfast", // Set the encoding speed/quality trade-off
-        "-movflags +faststart", // Optimize for web playback
-      ])
-      .output(videoPath)
-      .on("end", () => {
-        resolve(videoPath);
-      })
-      .on("error", (err, stdout, stderr) => {
-        console.error("FFmpeg error:", err);
-        console.error("FFmpeg stdout:", stdout);
-        console.error("FFmpeg stderr:", stderr);
-        reject(err);
-      })
-      .run();
-  });
 };
 
 const createCanvasWithCenteredText = async (

@@ -24,7 +24,13 @@ const getUser = async (req, res) => {
 
 //register new User
 const registerUser = async (req, res) => {
-  const { mobile, password, role, clientId } = req.body;
+  const { mobile, password, role, clientId, name } = req.body;
+
+  if (!mobile || !password || !role || !name) {
+    return res
+      .status(400)
+      .json({ message: "Please Enter all Requiered Details" });
+  }
 
   if (role === "customer" && !clientId) {
     return res
@@ -51,6 +57,7 @@ const registerUser = async (req, res) => {
       customers: [],
       sendRequests: [],
       receiveRequests: role === "customer" ? null : [],
+      name,
     });
 
     // Save new user to the database
