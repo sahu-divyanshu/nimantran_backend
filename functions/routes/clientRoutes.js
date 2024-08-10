@@ -1,6 +1,6 @@
 const router = require("express").Router();
 const { authenticateJWT, roleMiddleware } = require("../middleware/auth");
-const { getClient, createCustomer, transferCredit, purchaseRequestFromAdmin, getRequests } = require("../controllers/clientController");
+const { getClient, createCustomer, transferCredit, purchaseRequestFromAdmin, getRequests, getCustomerRequests } = require("../controllers/clientController");
 
 // Client - Information
 router.get(
@@ -14,6 +14,13 @@ router.get(
   authenticateJWT,
   roleMiddleware(["client"]),
   getRequests
+);
+
+router.get(
+  "/my-customer-requests",
+  authenticateJWT,
+  roleMiddleware(["client"]),
+  getCustomerRequests
 );
 
 // Client - Create Customer
@@ -39,5 +46,7 @@ router.post(
   roleMiddleware(["client"]),
   purchaseRequestFromAdmin
 );
+
+
 
 module.exports = router;

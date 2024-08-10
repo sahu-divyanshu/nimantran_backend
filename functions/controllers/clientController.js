@@ -22,7 +22,8 @@ const getClient = async (req, res) => {
 };
 
 const createCustomer = async (req, res) => {
-  const { name, mobile, password, email, gender, dateOfBirth, location } = req.body;
+  const { name, mobile, password, email, gender, dateOfBirth, location } =
+    req.body;
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
     const customer = new User({
@@ -31,10 +32,10 @@ const createCustomer = async (req, res) => {
       role: "customer",
       clientId: req?.user._id,
       name,
-      email, 
-      gender, 
-      dateOfBirth, 
-      location
+      email,
+      gender,
+      dateOfBirth,
+      location,
     });
 
     const newCustomer = await customer.save();
@@ -56,35 +57,41 @@ const createCustomer = async (req, res) => {
 const transferCredit = async (req, res) => {
   const { customerId, credits } = req.body;
   try {
-      const customer = await User.findOne({
-          _id: customerId,
-          clientId: req.user._id,
-      });
+    const customer = await User.findOne({
+      _id: customerId,
+      clientId: req.user._id,
+    });
 
-      if (!customer) throw new Error("Customer not found");
+    if (!customer) throw new Error("Customer not found");
 
-      const client = await User.findById(req.user._id);
+    const client = await User.findById(req.user._id);
 
-      if (client.credits < credits) throw new Error("Insufficient credits");
+    if (client.credits < credits) throw new Error("Insufficient credits");
 
-      client.credits -= credits;
-      customer.credits += credits;
+    client.credits -= credits;
+    customer.credits += credits;
 
-      await client.save();
-      console.log('Client credits updated');
+    await client.save();
+    console.log("Client credits updated");
 
-      await customer.save();
-      console.log('Customer credits updated');
+    await customer.save();
+    console.log("Customer credits updated");
 
-      // Create credit transaction for customer
-      const Transaction = await createTransaction("transfer", req.user._id, customerId, credits, 'completed', null);
+    // Create credit transaction for customer
+    const Transaction = await createTransaction(
+      "transfer",
+      req.user._id,
+      customerId,
+      credits,
+      "completed",
+      null
+    );
 
-      if (!Transaction) throw new Error("Failed to create credit transaction");
+    if (!Transaction) throw new Error("Failed to create credit transaction");
 
-      res.status(200).json({ message: "Credits transferred" });
+    res.status(200).json({ message: "Credits transferred" });
   } catch (error) {
-      console.error('Error transferring credits:', error.message);
-      res.status(400).send(`Error transferring credits: ${error.message}`);
+    res.status(400).json(error.message);
   }
 };
 
@@ -109,21 +116,18 @@ const purchaseRequestFromAdmin = async (req, res) => {
     if (admin.role !== "admin") {
       throw new Error("Requests can only be sent to admins");
     }
-   
 
     // Create the request
-
     const request = new Request({
       user: _id,
       credits,
       status: "pending",
     });
-    request.save();
-
+    await request.save();
 
     // Update client and admin documents
-    await client.updateOne({ $push: { sendRequests: request._id } });
-    await admin.updateOne({ $push: { receiveRequests: request._id } });
+    await client.updateOne({ $push: { sendRequests: adminId } });
+    await admin.updateOne({ $push: { receiveRequests: _id } });
 
     return res.status(200).json({ message: "Request sent successfully" });
   } catch (error) {
@@ -131,23 +135,55 @@ const purchaseRequestFromAdmin = async (req, res) => {
   }
 };
 
-const getRequests = async(req,res) =>{
+const getRequests = async (req, res) => {
   const user = req.user._id;
-  const requests = await Request.find({user}).populate('user').select("-password")
-  if(!requests){
+
+  const requests = await Request.find({ user }).populate("user", {
+    name: 1,
+    _id: 1,
+  });
+
+  if (!requests) {
     return res.status(401).json({
-      message:"no requests"
-    })
+      message: "no requests",
+    });
   }
+
   return res.status(200).json({
-    data:requests,
-    message:"requests fetched successfully"
-  })
-}
+    data: requests,
+    message: "requests fetched successfully",
+  });
+};
+
+const getCustomerRequests = async (req, res) => {
+  try {
+    const user = req.user._id;
+
+    const requests = await User.findById(user).select("receiveRequests");
+
+    const respData = await Promise.all(requests?.receiveRequests?.map((requestId) => {
+      return Request.find({user: requestId}).populate({path:"user", select: "name mobile"});
+    }))
+
+    if (!requests) throw new Error("there are no Requests.");
+
+    return res.status(200).json({
+      data: respData.flat(),
+      message: "requests fetched successfully",
+    });
+  } catch (error) {
+    return res.status(400).json({
+      message: error.message,
+      data: null,
+    });
+  }
+};
+
 module.exports = {
   getClient,
   createCustomer,
   transferCredit,
   purchaseRequestFromAdmin,
-  getRequests
+  getRequests,
+  getCustomerRequests,
 };

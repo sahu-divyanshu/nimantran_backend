@@ -65,15 +65,13 @@ const UserSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    clientId: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-        required: function () {
-          return this.role === "customer";
-        },
+    clientId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: function () {
+        return this.role === "customer";
       },
-    ],
+    },
     customers: [
       {
         type: mongoose.Schema.Types.ObjectId,

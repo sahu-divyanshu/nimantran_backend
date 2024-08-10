@@ -2,7 +2,6 @@ const express = require("express");
 const router = express.Router();
 const { createEvent, getAllEvents, updatedEvent, deleteEvent, getAllClientEvents, getEvent, getAllGuestMedia } = require("../controllers/eventController");
 const { authenticateJWT, roleMiddleware } = require("../middleware/auth");
-const upload = require("../middleware/multer");
 
 router.post('/create-event/:customerId', authenticateJWT, roleMiddleware(["client"]), createEvent);
 router.get('/get-all-events', authenticateJWT, getAllEvents);

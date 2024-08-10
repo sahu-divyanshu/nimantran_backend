@@ -17,6 +17,7 @@ const PdfRoutes = require("./routes/cardPdf");
 const eventRoutes = require("./routes/eventRoutes");
 const transictionRoutes = require("./routes/TransictionRoutes");
 const whatsappRoutes = require("./routes/whatSuppRoutes");
+
 const app = express();
 
 connectDB();
@@ -27,7 +28,7 @@ app.use("/tmp", express.static("tmp"));
 app.use(express.urlencoded({ extended: true }));
 
 app.get("/", (req, res) => {
-  res.json("Again 2 server started ....");
+  res.json("server started ....");
 });
 
 app.use("/api/admin", adminRoutes);

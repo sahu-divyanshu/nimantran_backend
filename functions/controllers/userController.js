@@ -1,6 +1,6 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const { User } = require("../models/User");
+const { User, Request } = require("../models/User");
 
 //get user info
 const getUser = async (req, res) => {
@@ -113,9 +113,9 @@ const loginUser = async (req, res) => {
 //Purchase Credits from client
 const purchaseRequestFromClient = async (req, res) => {
   const { credits } = req.body;
+
   try {
     const customer = await User.findById(req.user._id);
-    console.log(customer);
     const client = await User.findById(customer.clientId);
 
     if (!customer || !client) {
@@ -129,28 +129,22 @@ const purchaseRequestFromClient = async (req, res) => {
     if (client.role !== "client") {
       throw new Error("Requests can only be sent to clients");
     }
+    
+    // if (customer.clientId !== client._id) {
+    //   throw new Error("Customers can only send requests to their clients");
+    // }
 
-    if (!customer.clientId.includes(client._id)) {
-      throw new Error("Customers can only send requests to their clients");
-    }
-
-    const request = {
-      userId: customer.clientId,
-      credits,
-      status: "pending",
-    };
-
-    customer.sendRequests.push(request);
-    await customer.save();
-
-    client.receiveRequests.push({
-      userId: req.user._id,
+    const request = new Request({
+      user: req.user._id,
       credits,
       status: "pending",
     });
-    await client.save();
 
-    res.status(200).json({ message: "Request sent successfully" });
+    await request.save();
+    await client.updateOne({ $push: { receiveRequests: req.user._id } });
+    await customer.updateOne({ $push: { sendRequests: client._id } });
+
+    res.status(200).json({ message: "Request sent successfully", data: request });
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
