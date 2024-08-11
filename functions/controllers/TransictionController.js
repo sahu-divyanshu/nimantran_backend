@@ -36,61 +36,18 @@ const getClientTransaction = async (req, res) => {
     const { areaOfUse } = req.query;
     let transaction = [];
 
-    console.log(areaOfUse)
-
     if (areaOfUse === "transfer") {
-      //   transaction = await CreditTransaction.aggregate([
-      //     {
-      //       $match: {
-      //         areaOfUse: areaOfUse,
-      //         senderId: _id,
-      //       },
-      //     },
-      //     {
-      //       $lookup: {
-      //         from: "users", // Assuming your receiver collection is named 'users'
-      //         localField: "recieverId",
-      //         foreignField: "_id",
-      //         as: "reciever",
-      //       },
-      //     },
-      //     {
-      //       $unwind: "$reciever",
-      //     },
-      //     {
-      //       $lookup: {
-      //         from: "event", // Assuming your event collection is named 'events'
-      //         localField: "eventId",
-      //         foreignField: "_id",
-      //         as: "event",
-      //       },
-      //     },
-      //     {
-      //       $unwind: "$event",
-      //     },
-      //     {
-      //       $project: {
-      //         "reciever.name": 1,
-      //         amount: 1,
-      //         status: 1,
-      //         transactionDate: 1,
-      //         "event.eventName": 1,
-      //       },
-      //     },
-      //   ]);
-
       transaction = await CreditTransaction.find({
         senderId: _id,
         areaOfUse: areaOfUse,
       })
         .populate("recieverId", "name");
-
     }
 
-    if (["pdf", "image", "video"].includes(areaOfUse)) {
+    if (['spend'].includes(areaOfUse)) {
       transaction = await CreditTransaction.find({
         senderId: _id,
-        areaOfUse: areaOfUse,
+        areaOfUse: ['image', 'pdf', 'video'],
       }).populate("eventId");
     }
 
