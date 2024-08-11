@@ -2,7 +2,7 @@ const twilio = require("twilio"); // for business messages
 const { Event } = require("../models/Event");
 const { Client, MessageMedia } = require("whatsapp-web.js"); // for personal messages
 const qrcode = require("qrcode");
-const { response } = require("express");
+const { invitationTracker } = require("../models/InvitationTracker");
 
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
@@ -39,13 +39,38 @@ const individualWhatsuppPersonalInvite = async (req, res) => {
 
     // Fetch the media from the Firebase URL
     const media = await MessageMedia.fromUrl(mediaUrl);
+    if (!media) throw new Error("This Media cannot be sent on whatsupp.");
 
     // Send the media with an optional caption
-    const response = await clientPersonal.sendMessage(chatId, media, {
+    const invitations = await clientPersonal.sendMessage(chatId, media, {
       caption,
     });
+    if (!invitations) throw new Error("Something Wrong");
 
-    res.status(200).send({ success: true, response });
+    const invitation = {
+      from: invitations.from,
+      to: invitations.to,
+      mediaType: invitations.type,
+      status: "sended",
+    }
+
+    const isInvitationsExits = await invitationTracker.findOneAndUpdate(
+      { eventId },
+      {
+        $push: {
+          invitations: invitation,
+        },
+      }
+    );
+    if (!isInvitationsExits) {
+      const newInvitations = new invitationTracker({
+        eventId,
+        invitations: invitation,
+      });
+      await newInvitations.save();
+    }
+
+    res.status(200).send({ success: true, invitation });
   } catch (error) {
     res.status(500).send({ success: false, error: error.message });
   }
@@ -54,27 +79,50 @@ const individualWhatsuppPersonalInvite = async (req, res) => {
 const bulkWhatsuppPersonalInvite = async (req, res) => {
   try {
     const { eventId } = req.query;
-    const guests = await Event.findById(eventId).select("guests");
+    const guests = await Event.findById(eventId)?.select("guests");
 
-    guests?.guests?.forEach(async (guest) => {
-      const chatId = `${guest?.mobileNumber}@c.us`;
-      const caption = "This is a Invitation Message";
-      const mediaUrl = guest.link;
+    const invitations = await Promise.all(
+      guests?.guests?.map(async (guest) => {
+        const chatId = `${guest?.mobileNumber}@c.us`;
+        const caption = "This is a Invitation Message";
+        const mediaUrl = guest.link;
 
-      // Fetch the media from the Firebase URL
-      const media = await MessageMedia.fromUrl(mediaUrl);
+        // Fetch the media from the Firebase URL
+        const media = await MessageMedia.fromUrl(mediaUrl);
 
-      // Send the media with an optional caption
-      const response = await clientPersonal.sendMessage(chatId, media, {
-        caption,
+        // Send the media with an optional caption
+        const response = await clientPersonal?.sendMessage(chatId, media, {
+          caption,
+        });
+        return {
+          from: response.from,
+          to: response.to,
+          mediaType: response.type,
+          status: "sended", // ["sended", "notSended", "queued"]
+        };
+      })
+    );
+    if (!invitations) throw new Error("Something Wrong");
+
+    const isInvitationsExits = await invitationTracker.findOneAndUpdate(
+      { eventId },
+      {
+        $push: { invitations: invitations },
+      }
+    );
+    if (!isInvitationsExits) {
+      const newInvitations = new invitationTracker({
+        eventId,
+        invitations,
       });
+      await newInvitations.save();
+    }
 
-      console.log(response);
-    });
-
-    res.status(200).send({ success: true });
+    res
+      .status(200)
+      .json({ message: "Invitations are sended", data: invitations });
   } catch (error) {
-    res.status(500).send({ success: false, error: error.message });
+    res.status(400).json({ message: error.message });
   }
 };
 
@@ -94,7 +142,6 @@ const individualWhatsuppBusinessInvite = async (req, res) => {
     const savedEvent = await Event.findById(eventId);
 
     savedEvent.guests.forEach((guest) => {
-      console.log(guest.mobileNumber, mobileNumber);
       if (guest.mobileNumber === mobileNumber) {
         guest.sid.push(messageResp.sid);
       }
@@ -108,26 +155,39 @@ const individualWhatsuppBusinessInvite = async (req, res) => {
   }
 };
 
-const fetchWhatsappBusinessInfo = async (req, res) => {
+const bulkWhatsuppBusinessInvite = async (req, res) => {
+  try {
+    // later
+    return res.status(200).json({ data: null });
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
+};
+
+const fetchWhatsappInvitations = async (req, res) => {
   try {
     const { eventId } = req.query;
-    const guests = await Event.findById(eventId)?.select("guests");
-    if (!guests) throw new Error("Event not Found");
+    
+    const invitations = await invitationTracker.findOne({eventId});
+    if(!invitations) throw new Error("There are no Invitations yet");
 
-    const fetchedMessages = await Promise.all(
-      guests?.guests?.map(async (guest) => {
-        const populateGuests = await Promise.all(
-          guest?.sid?.map(async (sid) => {
-            const message = await client.messages(sid).fetch();
-            return message;
-          })
-        );
-        guest.sid = populateGuests;
-        return guest;
-      })
-    );
+    // const guests = await Event.findById(eventId)?.select("guests");
+    // if (!guests) throw new Error("Event not Found");
 
-    return res.status(200).json({ data: fetchedMessages });
+    // const fetchedMessages = await Promise.all(
+    //   guests?.guests?.map(async (guest) => {
+    //     const populateGuests = await Promise.all(
+    //       guest?.sid?.map(async (sid) => {
+    //         const message = await client.messages(sid).fetch();
+    //         return message;
+    //       })
+    //     );
+    //     guest.sid = populateGuests;
+    //     return guest;
+    //   })
+    // );
+
+    return res.status(200).json({ data: invitations?.invitations });
   } catch (error) {
     return res.status(400).json({ message: error.message });
   }
@@ -135,8 +195,9 @@ const fetchWhatsappBusinessInfo = async (req, res) => {
 
 module.exports = {
   individualWhatsuppBusinessInvite,
-  fetchWhatsappBusinessInfo,
+  fetchWhatsappInvitations,
   individualWhatsuppPersonalInvite,
   generateQR,
   bulkWhatsuppPersonalInvite,
+  bulkWhatsuppBusinessInvite,
 };
