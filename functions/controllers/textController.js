@@ -5,50 +5,31 @@ const { Text } = require("../models/Text");
 
 const saveText = async (req, res) => {
     const {
-        backgroundColor,
-        duration,
-        fontColor,
-        fontFamily,
-        fontSize,
-        fontStyle,
-        fontWeight,
-        hidden,
-        id,
-        page,
-        position,
-        size,
-        startTime,
-        text,
-        transition,
-        length,
-        eventId
+        eventId,
+        texts
     } = req.body;
 
-    if (!text) return res.status(400).json({ message: "Text not found" });
+    if (!texts) return res.status(400).json({ message: "Text not found" });
+    if (!eventId) return res.status(400).json({ message: "Event ID not found"});
 
+  
+        const textss = await Text.aggregate([
+            {
+                $match: {
+                    eventId: new mongoose.Types.ObjectId(eventId)
+                }
+            }, 
+        ])
+
+  
+if (textss.length <= 0 ) {
     try {
         const textUpload = await Text.create({
-            backgroundColor,
-            duration,
-            fontColor,
-            fontFamily,
-            fontSize,
-            fontStyle,
-            fontWeight,
-            hidden,
-            id,
-            page,
-            position,
-            size,
-            startTime,
-            text,
-            transition,
-            length,
-            eventId
+            eventId,
+            texts:[...texts],
         });
 
      
-
         if (!textUpload) {
             return res.status(400).json({ message: "Error uploading text" });
         }
@@ -58,6 +39,27 @@ const saveText = async (req, res) => {
         console.log(error);
         return res.status(500).json({ message: "Internal server error" });
     }
+} else {
+    try {
+        const updatedTexts = await Text.findOneAndUpdate(
+            {eventId},
+            {
+                $set:{
+                    texts:texts,
+                }
+            },
+            {new:true}
+        )
+        if (!updatedTexts) {
+            return res.status(400).json({ message: "Error updating text" });
+        }
+        return res.status(200).json(updatedTexts);
+
+    } catch (error) {
+        console.log(error);
+    }
+}
+    
 }
 
 
@@ -89,55 +91,17 @@ const getTexts = async (req, res) => {
                     pipeline: [
                         {
                             $project: {
-                                _id: 1, // Include the _id field if needed
-                                backgroundColor: 1,
-                                duration: 1,
-                                fontColor: 1,
-                                fontFamily: 1,
-                                fontSize: 1,
-                                fontStyle: 1,
-                                fontWeight: 1,
-                                hidden: 1,
-                                id: 1,
-                                page: 1,
-                                position: 1,
-                                size: 1,
-                                startTime: 1,
-                                text: 1,
-                                transition: 1,
-                                length: 1,
-                                eventId: 1
+
+                                eventId: 1,
+                                texts:1,
                             }
                         }
                     ]
                 }
             },
-            {
-                $unwind: "$eventDetails"
-            },
-            {
-                $project: {
-                    _id: 1,
-                    backgroundColor: 1,
-                    duration: 1,
-                    fontColor: 1,
-                    fontFamily: 1,
-                    fontSize: 1,
-                    fontStyle: 1,
-                    fontWeight: 1,
-                    hidden: 1,
-                    id: 1,
-                    page: 1,
-                    position: 1,
-                    size: 1,
-                    startTime: 1,
-                    text: 1,
-                    transition: 1,
-                    length: 1,
-                    eventId: 1,
-                    eventDetails: 1 // Include the event details
-                }
-            }
+
+            
+            
         ]);
 
         return res.status(200).json(texts);
