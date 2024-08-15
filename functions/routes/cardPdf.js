@@ -3,12 +3,11 @@ const { fileParser } = require("express-multipart-file-parser");
 const fs = require("fs");
 const path = require("path");
 const archiver = require("archiver");
-const csv = require("csv-parser");
 const { PDFDocument } = require("pdf-lib");
-const os = require('os');
+const os = require("os");
 const {
   createCanvasWithCenteredText,
-  addOrUpdateGuests
+  addOrUpdateGuests,
 } = require("../utility/proccessing");
 const createTransaction = require("../utility/creditTransiction");
 const { ref, uploadBytes, getDownloadURL } = require("firebase/storage");
@@ -19,14 +18,9 @@ const router = express.Router();
 
 const UPLOAD_DIR = os.tmpdir() || "/tmp";
 const PDF_UPLOAD_DIR = path.join(UPLOAD_DIR, "video");
-const CSV_UPLOAD_DIR = path.join(UPLOAD_DIR, "guestNames");
 
 if (!fs.existsSync(PDF_UPLOAD_DIR)) {
   fs.mkdirSync(PDF_UPLOAD_DIR);
-}
-
-if (!fs.existsSync(CSV_UPLOAD_DIR)) {
-  fs.mkdirSync(CSV_UPLOAD_DIR);
 }
 
 const uploadFileToFirebase = async (
@@ -103,20 +97,6 @@ const createPdfForGuest = async (
   }
 };
 
-const processCsvFile = (csvFilePath) => {
-  return new Promise((resolve, reject) => {
-    const guestNames = [];
-    fs.createReadStream(csvFilePath)
-      .pipe(csv())
-      .on("data", (data) => guestNames.push(data))
-      .on("end", () => {
-        fs.unlinkSync(csvFilePath);
-        resolve(guestNames);
-      })
-      .on("error", reject);
-  });
-};
-
 router.post(
   "/",
   authenticateJWT,
@@ -128,43 +108,33 @@ router.post(
         req.body;
 
       const eventId = req?.query?.eventId;
-      
+      let { guestNames } = req.body;
+
+      if (isSample === "true") {
+        guestNames = JSON.parse(guestNames);
+      } else {
+        guestNames = [
+          { name: "change guest", mobileNumber: "11111" },
+          { name: "second", mobileNumber: "22222" },
+        ];
+      }
+
       const inputFileName = req.files.find((val) => val.fieldname === "pdf");
-      const guestsFileName = req.files.find(
-        (val) => val.fieldname === "guestNames"
-      );
 
-      inputPath = `${path.join(PDF_UPLOAD_DIR)}/${
-        inputFileName.originalname
-      }`;
-
-      const csvFilePath =
-        isSample === "true"
-          ? ""
-          : `${path.join(CSV_UPLOAD_DIR)}/${guestsFileName.originalname}`;
+      inputPath = `${path.join(PDF_UPLOAD_DIR)}/${inputFileName.originalname}`;
 
       fs.writeFileSync(inputPath, inputFileName.buffer);
 
       if (isSample !== "true") {
         fs.writeFileSync(csvFilePath, guestsFileName.buffer);
       }
-      
+
       const texts = JSON.parse(textProperty);
 
       if (!texts || !inputPath) {
         return res
           .status(400)
           .json({ error: "Please provide the guest list and video." });
-      }
-
-      let guestNames = [];
-      if (isSample === "true") {
-        guestNames = [
-          { name: "pawan", mobile: "84145874" },
-          { name: "sanjay", mobile: "4258454" },
-        ];
-      } else {
-        guestNames = await processCsvFile(csvFilePath);
       }
 
       const zipFilename = `processed_pdfs_${Date.now()}.zip`;
@@ -197,7 +167,7 @@ router.post(
           const url = await uploadFileToFirebase(
             buffer,
             filename,
-            eventId, 
+            eventId,
             isSample,
             i
           );
@@ -238,7 +208,6 @@ router.post(
           videoUrls: guestNames,
         });
       });
-
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: "PDF processing failed" });

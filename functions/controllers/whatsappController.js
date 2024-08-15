@@ -8,7 +8,7 @@ const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const client = twilio(accountSid, authToken);
 const clientPersonal = new Client();
-let qrCodeData = "";
+let qrCodeData = null;
 
 clientPersonal.on("qr", (qr) => {
   qrcode.toDataURL(qr, (err, url) => {
@@ -16,36 +16,13 @@ clientPersonal.on("qr", (qr) => {
   });
 });
 
-clientPersonal.on("ready", () => {
-  console.log("WhatsApp Web is ready!");
-});
-
-clientPersonal.initialize();
-
-const generateQR = async (req, res) => {
-  try {
-    const qrCode = await new Promise((resolve, reject) => {
-      if (qrCodeData) {
-        resolve(qrCodeData);
-      } else {
-        clientPersonal.on("qr", (qr) => {
-          qrcode.toDataURL(qr, (err, url) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(url);
-            }
-          });
-        });
-      }
-    });
-
-    res.status(200).send({ qrCode });
-  } catch (err) {
-    res.status(500).send({ error: "Failed to generate QR code." });
-  }
+const generateQR = (req, res) => {
+  clientPersonal.initialize().then(() => {
+    res.status(200).send({ qrCode: qrCodeData });
+  }).catch(() => {
+    res.status(400).send({ qrCode: null })
+  });
 };
-
 
 const individualWhatsuppPersonalInvite = async (req, res) => {
   try {
@@ -69,7 +46,7 @@ const individualWhatsuppPersonalInvite = async (req, res) => {
       to: invitations.to,
       mediaType: invitations.type,
       status: "sended",
-    }
+    };
 
     const isInvitationsExits = await invitationTracker.findOneAndUpdate(
       { eventId },
@@ -184,9 +161,9 @@ const bulkWhatsuppBusinessInvite = async (req, res) => {
 const fetchWhatsappInvitations = async (req, res) => {
   try {
     const { eventId } = req.query;
-    
-    const invitations = await invitationTracker.findOne({eventId});
-    if(!invitations) throw new Error("There are no Invitations yet");
+
+    const invitations = await invitationTracker.findOne({ eventId });
+    if (!invitations) throw new Error("There are no Invitations yet");
 
     // const guests = await Event.findById(eventId)?.select("guests");
     // if (!guests) throw new Error("Event not Found");

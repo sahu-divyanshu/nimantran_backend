@@ -6,7 +6,6 @@ const ffmpeg = require("fluent-ffmpeg");
 const ffmpegPath = require("ffmpeg-static");
 const archiver = require("archiver");
 const { createCanvas, registerFont, deregisterAllFonts } = require("canvas");
-const csv = require("csv-parser");
 const { authenticateJWT } = require("../middleware/auth");
 const {
   downloadGoogleFont,
@@ -24,11 +23,7 @@ const router = express.Router();
 // const UPLOAD_DIR = path.join(__dirname, "../tmp");
 const UPLOAD_DIR = os.tmpdir() || "/tmp";
 const VIDEO_UPLOAD_DIR = path.join(UPLOAD_DIR, "video");
-const CSV_UPLOAD_DIR = path.join(UPLOAD_DIR, "guestNames");
 
-if (!fs.existsSync(CSV_UPLOAD_DIR)) {
-  fs.mkdirSync(CSV_UPLOAD_DIR);
-}
 if (!fs.existsSync(VIDEO_UPLOAD_DIR)) {
   fs.mkdirSync(VIDEO_UPLOAD_DIR);
 }
@@ -381,24 +376,24 @@ router.post(
 
       const eventId = req?.query?.eventId;
 
+      let {guestNames} = req.body
+
+      if(isSample === "true") {
+        guestNames = JSON.parse(guestNames);
+      } else {
+        guestNames = [
+          { name: "change guest", mobileNumber: "11111" },
+          { name: "second", mobileNumber: "22222" },
+        ]
+      }
+
       const inputFileName = req.files.find((val) => val.fieldname === "video");
-      const guestsFileName = req.files.find(
-        (val) => val.fieldname === "guestNames"
-      );
 
       inputPath = `${path.join(VIDEO_UPLOAD_DIR)}/${
         inputFileName.originalname
       }`;
-      const csvFilePath =
-        isSample === "true"
-          ? ""
-          : `${path.join(CSV_UPLOAD_DIR)}/${guestsFileName.originalname}`;
 
       fs.writeFileSync(inputPath, inputFileName.buffer);
-
-      if (isSample !== "true") {
-        fs.writeFileSync(csvFilePath, guestsFileName.buffer);
-      }
 
       if (!eventId) throw new Error("Required Event Id");
 
@@ -408,17 +403,6 @@ router.post(
         return res
           .status(400)
           .json({ error: "Please provide the guest list and video." });
-      }
-
-      let guestNames = [];
-
-      if (isSample === "true") {
-        guestNames = [
-          { name: "pawan", mobile: "84145874" },
-          { name: "sanjay", mobile: "4258454" },
-        ];
-      } else {
-        guestNames = await processCsvFile(csvFilePath);
       }
 
       const zipFilename = `processed_videos_${Date.now()}.zip`;
