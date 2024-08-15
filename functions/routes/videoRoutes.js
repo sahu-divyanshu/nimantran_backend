@@ -10,13 +10,13 @@ const { authenticateJWT } = require("../middleware/auth");
 const {
   downloadGoogleFont,
   addOrUpdateGuests,
+  uploadFileToFirebase,
 } = require("../utility/proccessing");
-const { app, firebaseStorage } = require("../firebaseConfig");
-const { ref, uploadBytes, getDownloadURL } = require("firebase/storage");
 const createTransaction = require("../utility/creditTransiction");
 const os = require("os");
 
 ffmpeg.setFfmpegPath(ffmpegPath);
+ffmpeg.setFfprobePath(ffmpegPath);
 
 const router = express.Router();
 
@@ -27,32 +27,6 @@ const VIDEO_UPLOAD_DIR = path.join(UPLOAD_DIR, "video");
 if (!fs.existsSync(VIDEO_UPLOAD_DIR)) {
   fs.mkdirSync(VIDEO_UPLOAD_DIR);
 }
-
-const uploadFileToFirebase = async (
-  fileBuffer,
-  filename,
-  eventId,
-  isSample,
-  i
-) => {
-  try {
-    let storageRef;
-    if (isSample === "true") {
-      storageRef = ref(
-        firebaseStorage,
-        `sample/sample${i}${i === "zip" ? ".zip" : ".png"}`
-      );
-    } else {
-      storageRef = ref(firebaseStorage, `uploads/${eventId}/${filename}`);
-    }
-    const snapshot = await uploadBytes(storageRef, fileBuffer);
-    const downloadURL = await getDownloadURL(snapshot.ref);
-    return downloadURL;
-  } catch (error) {
-    console.error("Error uploading file to Firebase:", error);
-    throw error;
-  }
-};
 
 const createCanvasWithCenteredText = async (
   val,
@@ -114,7 +88,8 @@ const createVideoForGuest = (
   scalingH,
   scalingW,
   val,
-  i
+  i,
+  videoDuration
 ) => {
   return new Promise(async (resolve, reject) => {
     const streams = await Promise.all(
@@ -137,7 +112,7 @@ const createVideoForGuest = (
       processedVideo.input(text.stream).loop(1); // change the loop time
     });
 
-    processedVideo.loop(60);
+    processedVideo.loop(videoDuration);
 
     const configuration = texts.flatMap((text, idx) => {
       const xPos = parseInt(text.position.x * scalingW);
@@ -343,7 +318,6 @@ const createVideoForGuest = (
         }
       })
       .on("error", (err) => {
-        console.log(err);
         reject(err);
       })
       .run();
@@ -371,20 +345,23 @@ router.post(
   async (req, res) => {
     let inputPath;
     try {
-      const { textProperty, scalingFont, scalingW, scalingH, isSample } =
+      const { textProperty, scalingFont, scalingW, scalingH, isSample, videoDuration } =
         req.body;
 
       const eventId = req?.query?.eventId;
 
-      let {guestNames} = req.body
+      let { guestNames } = req.body;
 
-      if(isSample === "true") {
-        guestNames = JSON.parse(guestNames);
-      } else {
+      if (isSample === "true") {
         guestNames = [
-          { name: "change guest", mobileNumber: "11111" },
-          { name: "second", mobileNumber: "22222" },
-        ]
+          { name: "pawan mishra", mobileNumber: "912674935684" },
+          {
+            name: "Wolf eschlegelst einhausen berger dorff",
+            mobileNumber: "913647683694",
+          },
+        ];
+      } else {
+        guestNames = JSON.parse(guestNames);
       }
 
       const inputFileName = req.files.find((val) => val.fieldname === "video");
@@ -427,10 +404,8 @@ router.post(
             scalingW,
             val,
             i,
-            eventId,
-            isSample
+            videoDuration
           );
-
           const filename = `${val?.name}_${val?.mobileNumber}.mp4`;
           archive.append(buffer, { name: filename });
 
@@ -438,8 +413,7 @@ router.post(
             buffer,
             filename,
             eventId,
-            isSample,
-            i
+            isSample
           );
 
           val.link = url;
@@ -455,8 +429,7 @@ router.post(
           zipBuffer,
           zipFilename,
           eventId,
-          isSample,
-          "zip"
+          isSample
         );
 
         fs.unlinkSync(zipPath);
@@ -464,7 +437,7 @@ router.post(
         if (isSample !== "true") {
           const amountSpend = 1 * guestNames.length;
 
-          await addOrUpdateGuests(eventId, guestNames);
+          await addOrUpdateGuests(eventId, guestNames, zipUrl);
           await createTransaction(
             "video",
             req.user._id,

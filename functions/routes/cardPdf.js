@@ -8,10 +8,9 @@ const os = require("os");
 const {
   createCanvasWithCenteredText,
   addOrUpdateGuests,
+  uploadFileToFirebase
 } = require("../utility/proccessing");
 const createTransaction = require("../utility/creditTransiction");
-const { ref, uploadBytes, getDownloadURL } = require("firebase/storage");
-const { app, firebaseStorage } = require("../firebaseConfig");
 const { authenticateJWT } = require("../middleware/auth");
 
 const router = express.Router();
@@ -22,32 +21,6 @@ const PDF_UPLOAD_DIR = path.join(UPLOAD_DIR, "video");
 if (!fs.existsSync(PDF_UPLOAD_DIR)) {
   fs.mkdirSync(PDF_UPLOAD_DIR);
 }
-
-const uploadFileToFirebase = async (
-  fileBuffer,
-  filename,
-  eventId,
-  isSample,
-  i
-) => {
-  try {
-    let storageRef;
-    if (isSample === "true") {
-      storageRef = ref(
-        firebaseStorage,
-        `sample/sample${i}${i === "zip" ? ".zip" : ".pdf"}`
-      );
-    } else {
-      storageRef = ref(firebaseStorage, `uploads/${eventId}/${filename}`);
-    }
-    const snapshot = await uploadBytes(storageRef, fileBuffer);
-    const downloadURL = await getDownloadURL(snapshot.ref);
-    return downloadURL;
-  } catch (error) {
-    console.error("Error uploading file to Firebase:", error);
-    throw error;
-  }
-};
 
 const createPdfForGuest = async (
   inputPath,
@@ -100,7 +73,7 @@ const createPdfForGuest = async (
 router.post(
   "/",
   authenticateJWT,
-  fileParser({ rawBodyOptions: { limit: "100mb" } }),
+  fileParser({ rawBodyOptions: { limit: "200mb" } }),
   async (req, res) => {
     let inputPath;
     try {
@@ -111,12 +84,12 @@ router.post(
       let { guestNames } = req.body;
 
       if (isSample === "true") {
-        guestNames = JSON.parse(guestNames);
-      } else {
         guestNames = [
-          { name: "change guest", mobileNumber: "11111" },
-          { name: "second", mobileNumber: "22222" },
+          { name: "pawan mishra", mobileNumber: "912674935684" },
+          { name: "Wolf eschlegelst einhausen berger dorff", mobileNumber: "913647683694" },
         ];
+      } else {
+        guestNames = JSON.parse(guestNames);
       }
 
       const inputFileName = req.files.find((val) => val.fieldname === "pdf");
@@ -124,10 +97,6 @@ router.post(
       inputPath = `${path.join(PDF_UPLOAD_DIR)}/${inputFileName.originalname}`;
 
       fs.writeFileSync(inputPath, inputFileName.buffer);
-
-      if (isSample !== "true") {
-        fs.writeFileSync(csvFilePath, guestsFileName.buffer);
-      }
 
       const texts = JSON.parse(textProperty);
 
@@ -169,7 +138,6 @@ router.post(
             filename,
             eventId,
             isSample,
-            i
           );
           val.link = url;
           return url;
@@ -185,14 +153,13 @@ router.post(
           zipFilename,
           eventId,
           isSample,
-          "zip"
         );
         fs.unlinkSync(zipPath);
 
         if (isSample !== "true") {
           const amountSpend = 0.5 * guestNames.length;
 
-          await addOrUpdateGuests(eventId, guestNames);
+          await addOrUpdateGuests(eventId, guestNames, zipUrl);
           await createTransaction(
             "pdf",
             eventId,
