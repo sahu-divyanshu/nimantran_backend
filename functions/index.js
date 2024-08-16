@@ -28,7 +28,7 @@ app.use("/tmp", express.static("tmp"));
 app.use(express.urlencoded({ extended: true }));
 
 app.get("/", (req, res) => {
-  res.json("server started ....");
+  res.json("server started .........");
 });
 
 app.use("/api/admin", adminRoutes);
@@ -42,7 +42,6 @@ app.use("/api/whatsapp", whatsappRoutes);
 app.use("/api/videoEdit", videoRoutes);
 app.use("/api/imageEdit", cardRoutes);
 app.use("/api/pdfEdit", PdfRoutes);
-
 app.use("/api/",textRoutes)
 
 app.listen(8000, () => {
