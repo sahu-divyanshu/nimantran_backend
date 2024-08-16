@@ -2,6 +2,9 @@
 const mongoose = require("mongoose");
 const { Text } = require("../models/Text");
 const { ref, uploadBytes, getDownloadURL } = require("firebase/storage");
+const { fileParser } = require("express-multipart-file-parser");
+const path = require("path");
+const { app, firebaseStorage } = require("../firebaseConfig");
 
 const uploadFileToFirebase = async (
     fileBuffer,
@@ -28,6 +31,31 @@ const uploadFileToFirebase = async (
       throw error;
     }
   };
+  const uploadFile = async (req ,res) =>{
+    const { eventId} = req.query;
+    
+    const patToFile = req.files[0]?.name;
+
+   const fileExtension = path.extname(patToFile)
+
+   const fileName = eventId +"file" + fileExtension;
+   const buffer = req.files[0]?.buffer;
+   console.log(fileName)
+   const url = await uploadFileToFirebase(buffer,fileName,eventId,false,0)
+    if(!url){
+        return res.status(400).json({ message: "Error uploading image" });
+    }
+
+   
+    const file = await Text.findOneAndUpdate({eventId},{
+        $set: {
+            inputFile: url
+        }
+    },{new: true});
+    return res.status(200).json({file});
+    
+  }
+
 
 const saveText = async (req, res) => {
     const {
@@ -121,6 +149,7 @@ const getTexts = async (req, res) => {
 
                                 eventId: 1,
                                 texts:1,
+                                inputFile:1
                             }
                         }
                     ]
@@ -141,4 +170,4 @@ const getTexts = async (req, res) => {
 
 
 
-module.exports = {saveText,getTexts};
+module.exports = {saveText,getTexts,uploadFile};

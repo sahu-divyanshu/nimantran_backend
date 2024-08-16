@@ -1,11 +1,12 @@
 const mongoose = require("mongoose");
+const { Number } = require("twilio/lib/twiml/VoiceResponse");
 
 const TextSchema = new mongoose.Schema({
   eventId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Event",
   },
-  video:{
+  inputFile:{
     type:String,
   },
   texts: [
@@ -21,12 +22,12 @@ const TextSchema = new mongoose.Schema({
       id: Number,
       page: Number,
       position: {
-        x: mongoose.Schema.Types.Decimal128,
-        y: mongoose.Schema.Types.Decimal128,
+        x: Number,
+        y: Number,
       },
       size: {
-        height: mongoose.Schema.Types.Decimal128,
-        width: mongoose.Schema.Types.Decimal128,
+        height: Number,
+        width: Number,
       },
       startTime: mongoose.Schema.Types.Decimal128,
       text: String,
