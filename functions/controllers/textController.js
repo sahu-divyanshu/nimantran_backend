@@ -32,7 +32,7 @@ const uploadFileToFirebase = async (
     }
   };
   const uploadFile = async (req ,res) =>{
-    
+    console.log(req.files)
     const { eventId} = req?.query;
     let inputFilePath = req.files.find((val) => val.fieldname === "inputfile");
     const buffer = inputFilePath.buffer;
@@ -48,12 +48,16 @@ const uploadFileToFirebase = async (
     if(!url){
         return res.status(400).json({ message: "Error uploading image" });
     }
-    const file = await Text.findOneAndUpdate({eventId},{
+    console.log(eventId)
+    const text = await Text.findOne({ eventId: eventId });
+    console.log(text)
+    const file = await Text.findOneAndUpdate({eventId: eventId},{
         $set: {
-            inputFile: url
+            inputFile: url,
         }
     },{new: true});
-    return res.status(200).json({file});
+    console.log(file)
+    return res.status(200).json({url,file});
   }
 
 
@@ -149,7 +153,7 @@ const getTexts = async (req, res) => {
 
                                 eventId: 1,
                                 texts:1,
-                                inputFile:1
+                                inputFile:1,
                             }
                         }
                     ]
